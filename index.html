@@ -420,7 +420,7 @@
 <!-- TOP BAR -->
 <div class="topbar">
   <h1>Mon<span>Pognon</span></h1>
-  <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.4.0</div>
+  <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.4.6</div>
 </div>
 
 <!-- MAIN -->
@@ -460,66 +460,31 @@
     <div class="card" id="recent-tx-list">
       <div class="empty-state"><span class="emoji">💸</span><p>Aucune opération</p></div>
     </div>
+
+    <div class="section-title">Opérations à venir</div>
+    <div class="card" id="upcoming-tx-list">
+      <div class="empty-state"><span class="emoji">⏳</span><p>Aucune opération à venir</p></div>
+    </div>
   </div>
 
   <!-- ══ PAGE: SAISIE ══ -->
   <div class="page" id="page-saisie">
-    <div class="section-title" style="margin-top:0">Nouvelle opération</div>
-    <div class="type-toggle" style="grid-template-columns:1fr 1fr 1fr">
-      <div class="type-btn active income" id="btn-income" onclick="setType('income')">+ Recette</div>
-      <div class="type-btn expense" id="btn-expense" onclick="setType('expense')">− Dépense</div>
-      <div class="type-btn transfer" id="btn-transfer" onclick="setType('transfer')">⇄ Virement</div>
-    </div>
-    <div class="form-group">
-      <label>Libellé</label>
-      <div class="label-input-wrap" id="tx-label-wrap">
-        <input type="text" id="tx-label" placeholder="Tapez ou choisissez…" autocomplete="off"
-          oninput="filterLabels('tx')" onfocus="filterLabels('tx')" onkeydown="labelKeydown(event,'tx')">
-        <button class="label-save-btn" id="tx-label-save" onclick="saveNewLabel('tx')" title="Sauvegarder ce libellé">＋</button>
-        <div class="label-dropdown" id="tx-label-dropdown"></div>
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Montant (€)</label>
-      <input type="number" id="tx-amount" placeholder="0,00" step="0.01" inputmode="decimal">
-    </div>
-    <div class="form-group">
-      <label id="tx-account-label">Compte</label>
-      <select id="tx-account"></select>
-    </div>
-    <div class="form-group" id="tx-account-to-group" style="display:none">
-      <label>Compte destinataire</label>
-      <select id="tx-account-to"></select>
-    </div>
-    <div class="form-group" id="tx-category-group">
-      <label>Catégorie</label>
-      <select id="tx-category"></select>
-    </div>
-    <div class="form-group">
-      <label>Date</label>
-      <input type="date" id="tx-date">
-    </div>
-    <button class="btn btn-primary" onclick="addTransaction()">Enregistrer l'opération</button>
-  </div>
-
-  <!-- ══ PAGE: RÉCURRENTS ══ -->
-  <div class="page" id="page-recurring">
-    <div class="card" style="background:rgba(245,158,11,.07);border-color:rgba(245,158,11,.2)">
-      <div style="font-size:13px;color:var(--orange);font-weight:600;margin-bottom:4px">ℹ️ Charges récurrentes</div>
-      <div style="font-size:12px;color:var(--muted);line-height:1.5">Ces charges sont déduites automatiquement chaque 1er du mois du compte désigné et entrent dans le calcul du solde théorique.</div>
-    </div>
-
+    <!-- Opérations saisies — non récurrentes -->
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-      <div class="section-title" style="margin:0;flex:1">Charges en cours</div>
-      <select id="rec-filter-account" onchange="renderRecurring()"
-        style="font-size:12px;padding:5px 8px;border-radius:10px;background:var(--bg3);border:1px solid var(--border);color:var(--text);max-width:140px">
+      <div class="section-title" style="margin:0;flex:1">Opérations</div>
+      <select id="ops-filter-account" onchange="renderOperations()"
+        style="font-size:12px;padding:5px 8px;border-radius:10px;background:var(--bg3);border:1px solid var(--border);color:var(--text);max-width:130px">
         <option value="">Tous les comptes</option>
       </select>
+      <select id="ops-filter-type" onchange="renderOperations()"
+        style="font-size:12px;padding:5px 8px;border-radius:10px;background:var(--bg3);border:1px solid var(--border);color:var(--text);max-width:100px">
+        <option value="">Tout</option>
+        <option value="income">Recettes</option>
+        <option value="expense">Dépenses</option>
+        <option value="transfer">Virements</option>
+      </select>
     </div>
-    <div id="recurring-list">
-      <div class="empty-state"><span class="emoji">🔄</span><p>Aucune charge récurrente</p></div>
-    </div>
-    <button class="btn btn-primary" onclick="openSheet('recurring-sheet')">+ Ajouter une opération récurrente</button>
+    <div id="operations-list"></div>
   </div>
 
   <!-- ══ PAGE: STATS ══ -->
@@ -584,6 +549,25 @@
     <div class="section-title" style="margin-top:0">Comptes</div>
     <div class="card" id="accounts-list-manage"></div>
     <button class="btn btn-primary" onclick="openSheet('account-sheet')" style="margin-top:8px;width:100%">+ Créer un compte</button>
+
+    <div style="height:16px"></div>
+
+    <!-- ── RÉCURRENTS ── -->
+    <div class="card" style="background:rgba(245,158,11,.07);border-color:rgba(245,158,11,.2);margin-bottom:8px">
+      <div style="font-size:12px;color:var(--orange);font-weight:600;margin-bottom:2px">ℹ️ Opérations récurrentes</div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.5">Déduites automatiquement chaque mois selon le jour prévu.</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <div class="section-title" style="margin:0;flex:1">Récurrentes</div>
+      <select id="rec-filter-account" onchange="renderRecurring()"
+        style="font-size:12px;padding:5px 8px;border-radius:10px;background:var(--bg3);border:1px solid var(--border);color:var(--text);max-width:140px">
+        <option value="">Tous les comptes</option>
+      </select>
+    </div>
+    <div id="recurring-list">
+      <div class="empty-state"><span class="emoji">🔄</span><p>Aucune opération récurrente</p></div>
+    </div>
+    <button class="btn btn-primary" onclick="openSheet('recurring-sheet')" style="margin-top:8px;width:100%">+ Ajouter une opération récurrente</button>
 
     <div style="height:16px"></div>
 
@@ -660,12 +644,8 @@
     Tableau
   </div>
   <div class="nav-item" onclick="showPage('saisie',this)">
-    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
-    Saisie
-  </div>
-  <div class="nav-item" onclick="showPage('recurring',this)">
-    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 013.51 15"/></svg>
-    Récurrents
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+    Opérations
   </div>
   <div class="nav-item" onclick="showPage('stats',this)">
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
@@ -761,7 +741,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.6';
 
 const DEFAULT_CATEGORIES = [
   { id:'salary',    label:'Salaire',      icon:'💼', color:'#10b981', system:true },
@@ -859,9 +839,8 @@ function showPage(name, el) {
   document.getElementById('page-'+name).classList.add('active');
   if(el) el.classList.add('active');
   if(name==='stats') renderStats();
-  if(name==='saisie') { populateSelects(); }
-  if(name==='recurring') { populateSelects(); renderRecurring(); }
-  if(name==='settings') { renderSettings(); renderAccountsManage(); }
+  if(name==='saisie') { renderOperations(); }
+  if(name==='settings') { renderSettings(); renderAccountsManage(); renderRecurring(); }
 }
 
 // ════════════════════════════════════
@@ -1109,11 +1088,92 @@ function renderAccountsManage() {
         <div class="tx-amount ${bal>=0?'income':'expense'}">${fmt(bal)}</div>
         <div style="display:flex;align-items:center;gap:8px">
           ${toggleSwitch}
+          <span style="font-size:10px;color:var(--accent);cursor:pointer" onclick="openEditAccount('${a.id}')">✏️</span>
           <span style="font-size:10px;color:var(--red);cursor:pointer" onclick="deleteAccount('${a.id}')">🗑</span>
         </div>
       </div>
     </div>`;
   }).join('');
+}
+
+function openEditAccount(id) {
+  const a = db.accounts.find(a=>a.id===id);
+  if(!a) return;
+  const old = document.getElementById('edit-account-modal');
+  if(old) old.remove();
+
+  const typeOptions = Object.entries(ACCOUNT_TYPES).map(([k,v])=>
+    `<option value="${k}" ${k===a.type?'selected':''}>${v.icon} ${v.label}</option>`
+  ).join('');
+
+  const iconList = ['🏦','💳','💰','📊','🐖','🏡','🌱','📗','📈','🚗'];
+  const iconPicker = iconList.map(ic=>
+    `<span data-icon="${ic}" onclick="pickEditIcon(this)"
+      style="font-size:22px;cursor:pointer;padding:5px;border-radius:8px;border:2px solid ${ic===a.icon?'var(--accent2)':'transparent'}">${ic}</span>`
+  ).join('');
+
+  const modal = document.createElement('div');
+  modal.id = 'edit-account-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:flex-end';
+  modal.innerHTML = `
+    <div style="background:var(--bg2);border-radius:20px 20px 0 0;width:100%;padding:20px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:15px;font-weight:700;color:var(--text)">Modifier le compte</span>
+        <button onclick="document.getElementById('edit-account-modal').remove()" style="background:var(--bg3);border:none;color:var(--muted);font-size:18px;padding:4px 10px;border-radius:8px;cursor:pointer">✕</button>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>Nom</label>
+        <input type="text" id="edit-acc-name" value="${a.name}" maxlength="40">
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>Type</label>
+        <select id="edit-acc-type" onchange="syncEditIconToType()">${typeOptions}</select>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>Solde initial (€)</label>
+        <input type="number" id="edit-acc-balance" value="${a.initialBalance}" step="0.01" inputmode="decimal">
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>Icône</label>
+        <div id="edit-icon-picker" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${iconPicker}</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onclick="saveEditAccount('${id}')" class="btn btn-primary" style="flex:1">Enregistrer</button>
+        <button onclick="document.getElementById('edit-account-modal').remove()" class="btn" style="flex:0 0 auto;background:var(--bg3);color:var(--muted);border:none">Annuler</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  window._editAccIcon = a.icon;
+}
+
+function pickEditIcon(el) {
+  window._editAccIcon = el.dataset.icon;
+  document.querySelectorAll('#edit-icon-picker span').forEach(s=>{
+    s.style.borderColor = s.dataset.icon===window._editAccIcon ? 'var(--accent2)' : 'transparent';
+  });
+}
+
+function syncEditIconToType() {
+  const type = document.getElementById('edit-acc-type').value;
+  const icon = ACCOUNT_TYPES[type]?.icon || '🏦';
+  window._editAccIcon = icon;
+  document.querySelectorAll('#edit-icon-picker span').forEach(s=>{
+    s.style.borderColor = s.dataset.icon===icon ? 'var(--accent2)' : 'transparent';
+  });
+}
+
+function saveEditAccount(id) {
+  const a = db.accounts.find(a=>a.id===id);
+  if(!a) return;
+  const name = document.getElementById('edit-acc-name').value.trim();
+  if(!name) { alert('Nom obligatoire'); return; }
+  a.name           = name;
+  a.type           = document.getElementById('edit-acc-type').value;
+  a.icon           = window._editAccIcon || ACCOUNT_TYPES[a.type]?.icon || '🏦';
+  a.initialBalance = parseFloat(document.getElementById('edit-acc-balance').value)||0;
+  save();
+  document.getElementById('edit-account-modal').remove();
+  renderAccountsManage(); renderDashboard(); populateSelects();
 }
 
 function toggleAccountInclude(id) {
@@ -1284,19 +1344,17 @@ function pushTransaction(tx) {
   tx.id = Date.now().toString();
   db.transactions.unshift(tx);
   incrementLabelUse(tx.label, tx.category);
-  save(); renderDashboard(); renderStats();
+  save(); renderDashboard(); renderStats(); renderOperations();
 }
 
 function pushTransfer({label, amount, fromAccountId, toAccountId, date}) {
   const transferId = Date.now().toString();
-  // Débit sur le compte source
   db.transactions.unshift({
     id: transferId + '_out',
     label, amount, accountId: fromAccountId,
     category: 'savings', date,
     type: 'expense', isTransfer: true, transferId, transferTo: toAccountId
   });
-  // Crédit sur le compte destinataire
   db.transactions.unshift({
     id: transferId + '_in',
     label, amount, accountId: toAccountId,
@@ -1304,19 +1362,18 @@ function pushTransfer({label, amount, fromAccountId, toAccountId, date}) {
     type: 'income', isTransfer: true, transferId, transferFrom: fromAccountId
   });
   incrementLabelUse(label, 'savings');
-  save(); renderDashboard(); renderStats();
+  save(); renderDashboard(); renderStats(); renderOperations();
 }
 
 function deleteTransaction(id) {
   const tx = db.transactions.find(t=>t.id===id);
   if(tx && tx.isTransfer && tx.transferId) {
-    // Supprimer les deux jambes du virement
     if(!confirm('Supprimer le virement complet (les deux mouvements) ?')) return;
     db.transactions = db.transactions.filter(t=>t.transferId!==tx.transferId);
   } else {
     db.transactions = db.transactions.filter(t=>t.id!==id);
   }
-  save(); renderDashboard(); renderStats();
+  save(); renderDashboard(); renderStats(); renderOperations();
 }
 
 // ════════════════════════════════════
@@ -1685,38 +1742,169 @@ function renderDashboard() {
     }).join('');
   }
 
-  // Recent transactions
-  const recent = db.transactions.slice(0,8);
+  // 3 dernières opérations passées
+  const todayStr = today();
+  const recent = [...db.transactions]
+    .filter(t => t.date <= todayStr)
+    .sort((a,b)=>b.date.localeCompare(a.date))
+    .slice(0,3);
   const txEl = document.getElementById('recent-tx-list');
   if(!recent.length) {
-    txEl.innerHTML='<div class="empty-state"><span class="emoji">💸</span><p>Aucune opération</p></div>'; return;
+    txEl.innerHTML='<div class="empty-state"><span class="emoji">💸</span><p>Aucune opération</p></div>';
+  } else {
+    txEl.innerHTML = recent.map(t=>{
+      if(t.isTransfer && t.id.endsWith('_in')) return '';
+      const cat = CATEGORIES.find(c=>c.id===t.category)||CATEGORIES[8];
+      const acc = db.accounts.find(a=>a.id===t.accountId);
+      const isTransfer = t.isTransfer;
+      const toAcc = isTransfer ? db.accounts.find(a=>a.id===t.transferTo) : null;
+      const icon  = isTransfer ? '⇄' : cat.icon;
+      const bgCol = isTransfer ? 'rgba(59,130,246,.12)' : (t.type==='income'?'rgba(16,185,129,.12)':'rgba(244,63,94,.12)');
+      const subText = isTransfer
+        ? `${t.date} · ${acc?acc.name:'?'} → ${toAcc?toAcc.name:'?'}`
+        : `${t.date} · ${acc?acc.name:'?'} · ${cat.label}`;
+      const amtColor = isTransfer ? 'style="color:var(--accent)"' : '';
+      const amtPrefix = isTransfer ? '⇄' : (t.type==='income'?'+':'-');
+      return `<div class="tx-item">
+        <div class="tx-icon" style="background:${bgCol};font-size:${isTransfer?'16px':'18px'}">${icon}</div>
+        <div class="tx-info">
+          <div class="tx-name">${t.label}</div>
+          <div class="tx-sub">${subText}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="tx-amount" ${amtColor}>${amtPrefix}${fmt(t.amount)}</div>
+          <div style="font-size:10px;color:var(--muted);cursor:pointer;margin-top:2px" onclick="deleteTransaction('${t.id}')">🗑</div>
+        </div>
+      </div>`;
+    }).filter(Boolean).join('');
   }
-  txEl.innerHTML = recent.map(t=>{
-    // Ne pas afficher les deux jambes d'un virement — afficher seulement le _out
-    if(t.isTransfer && t.id.endsWith('_in')) return '';
-    const cat = CATEGORIES.find(c=>c.id===t.category)||CATEGORIES[8];
-    const acc = db.accounts.find(a=>a.id===t.accountId);
-    const isTransfer = t.isTransfer;
-    const toAcc = isTransfer ? db.accounts.find(a=>a.id===t.transferTo) : null;
-    const icon  = isTransfer ? '⇄' : cat.icon;
-    const bgCol = isTransfer ? 'rgba(59,130,246,.12)' : (t.type==='income'?'rgba(16,185,129,.12)':'rgba(244,63,94,.12)');
-    const subText = isTransfer
-      ? `${t.date} · ${acc?acc.name:'?'} → ${toAcc?toAcc.name:'?'}`
-      : `${t.date} · ${acc?acc.name:'?'} · ${cat.label}`;
-    const amtColor = isTransfer ? 'style="color:var(--accent)"' : '';
-    const amtPrefix = isTransfer ? '⇄' : (t.type==='income'?'+':'-');
-    return `<div class="tx-item">
-      <div class="tx-icon" style="background:${bgCol};font-size:${isTransfer?'16px':'18px'}">${icon}</div>
-      <div class="tx-info">
-        <div class="tx-name">${t.label}</div>
-        <div class="tx-sub">${subText}</div>
+
+  // 5 prochaines opérations à venir (récurrentes actives dont le jour > aujourd'hui)
+  const upcoming = db.recurringCharges
+    .filter(r => r.active !== false && r.day > todayDay)
+    .sort((a,b) => a.day - b.day)
+    .slice(0, 5);
+
+  const yr  = now.getFullYear();
+  const mo  = String(now.getMonth()+1).padStart(2,'0');
+
+  const upEl = document.getElementById('upcoming-tx-list');
+  if(!upcoming.length) {
+    upEl.innerHTML='<div class="empty-state"><span class="emoji">⏳</span><p>Aucune opération à venir ce mois</p></div>';
+  } else {
+    upEl.innerHTML = upcoming.map(r => {
+      const acc     = db.accounts.find(a=>a.id===r.accountId);
+      const toAcc   = r.toAccountId ? db.accounts.find(a=>a.id===r.toAccountId) : null;
+      const cat     = CATEGORIES.find(c=>c.id===r.category)||CATEGORIES[8];
+      const isTransfer = r.type==='transfer';
+      const isIncome   = r.type==='income';
+      const icon    = isTransfer ? '⇄' : cat.icon;
+      const bgCol   = isTransfer ? 'rgba(59,130,246,.12)' : isIncome ? 'rgba(16,185,129,.12)' : 'rgba(244,63,94,.12)';
+      const amtColor = isTransfer ? 'color:var(--accent)' : isIncome ? 'color:var(--green)' : 'color:var(--red)';
+      const amtPrefix = isTransfer ? '⇄' : isIncome ? '+' : '-';
+      const dateStr = `${yr}-${mo}-${String(r.day).padStart(2,'0')}`;
+      const subText = isTransfer
+        ? `${dateStr} · ${acc?acc.name:'?'} → ${toAcc?toAcc.name:'?'}`
+        : `${dateStr} · ${acc?acc.name:'?'} · ${cat.label}`;
+      return `<div class="tx-item">
+        <div class="tx-icon" style="background:${bgCol};font-size:${isTransfer?'16px':'18px'}">${icon}</div>
+        <div class="tx-info">
+          <div class="tx-name">${r.label}</div>
+          <div class="tx-sub">${subText}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="tx-amount" style="${amtColor}">${amtPrefix}${fmt(r.amount)}</div>
+          <div style="font-size:10px;color:var(--orange);font-weight:600;margin-top:2px">J-${r.day - todayDay}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+
+// ════════════════════════════════════
+//  OPÉRATIONS
+// ════════════════════════════════════
+function renderOperations() {
+  const el = document.getElementById('operations-list');
+  if(!el) return;
+
+  // Alimenter filtre compte
+  const accSel = document.getElementById('ops-filter-account');
+  if(accSel) {
+    const cur = accSel.value;
+    accSel.innerHTML = '<option value="">Tous les comptes</option>' +
+      db.accounts.map(a=>`<option value="${a.id}" ${a.id===cur?'selected':''}>${a.icon} ${a.name}</option>`).join('');
+    accSel.value = cur;
+  }
+
+  const filterAcc  = accSel ? accSel.value : '';
+  const filterType = document.getElementById('ops-filter-type')?.value || '';
+
+  // Toutes les transactions non récurrentes
+  let txs = db.transactions.filter(t => !t.isRecurring);
+
+  // Filtre jambe entrante des virements (évite doublon)
+  txs = txs.filter(t => !(t.isTransfer && t.id.endsWith('_in')));
+
+  if(filterAcc)  txs = txs.filter(t => t.accountId === filterAcc || t.transferTo === filterAcc);
+  if(filterType) txs = txs.filter(t => t.type === filterType);
+
+  txs = txs.sort((a,b) => b.date.localeCompare(a.date));
+
+  if(!txs.length) {
+    el.innerHTML='<div class="empty-state"><span class="emoji">📋</span><p>Aucune opération</p></div>'; return;
+  }
+
+  // Grouper par mois
+  const groups = {};
+  txs.forEach(t => {
+    const key = t.date.substring(0,7); // YYYY-MM
+    if(!groups[key]) groups[key] = [];
+    groups[key].push(t);
+  });
+
+  const monthNames = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+
+  el.innerHTML = Object.keys(groups).sort((a,b)=>b.localeCompare(a)).map(key => {
+    const [yr, mo] = key.split('-');
+    const label = `${monthNames[parseInt(mo)-1]} ${yr}`;
+    const items = groups[key];
+    const total = items.reduce((s,t) => s + (t.type==='income' ? t.amount : t.type==='expense' ? -t.amount : 0), 0);
+
+    const rows = items.map(t => {
+      const cat    = CATEGORIES.find(c=>c.id===t.category)||CATEGORIES[8];
+      const acc    = db.accounts.find(a=>a.id===t.accountId);
+      const toAcc  = t.transferTo ? db.accounts.find(a=>a.id===t.transferTo) : null;
+      const isT    = t.isTransfer;
+      const icon   = isT ? '⇄' : cat.icon;
+      const bgCol  = isT ? 'rgba(59,130,246,.12)' : t.type==='income' ? 'rgba(16,185,129,.12)' : 'rgba(244,63,94,.12)';
+      const amtCol = isT ? 'var(--accent)' : t.type==='income' ? 'var(--green)' : 'var(--red)';
+      const prefix = isT ? '⇄' : t.type==='income' ? '+' : '-';
+      const sub    = isT
+        ? `${t.date} · ${acc?acc.name:'?'} → ${toAcc?toAcc.name:'?'}`
+        : `${t.date} · ${acc?acc.name:'?'} · ${cat.label}`;
+      return `<div class="tx-item">
+        <div class="tx-icon" style="background:${bgCol};font-size:${isT?'16px':'18px'}">${icon}</div>
+        <div class="tx-info">
+          <div class="tx-name">${t.label}</div>
+          <div class="tx-sub">${sub}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="tx-amount" style="color:${amtCol}">${prefix}${fmt(t.amount)}</div>
+          <div style="font-size:10px;color:var(--muted);cursor:pointer;margin-top:2px" onclick="deleteTransaction('${t.id}')">🗑</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    return `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 4px">
+        <span style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">${label}</span>
+        <span style="font-size:12px;font-family:'DM Mono',monospace;font-weight:600;color:${total>=0?'var(--green)':'var(--red)'}">
+          ${total>=0?'+':''}${fmt(total)}
+        </span>
       </div>
-      <div style="text-align:right">
-        <div class="tx-amount" ${amtColor}>${amtPrefix}${fmt(t.amount)}</div>
-        <div style="font-size:10px;color:var(--muted);cursor:pointer;margin-top:2px" onclick="deleteTransaction('${t.id}')">🗑</div>
-      </div>
-    </div>`;
-  }).filter(Boolean).join('');
+      <div class="card" style="padding:0;overflow:hidden">${rows}</div>`;
+  }).join('');
 }
 
 // ════════════════════════════════════
@@ -1757,6 +1945,7 @@ function getPeriodRange() {
 
 function txInPeriod(start, end, accountId) {
   return db.transactions.filter(t=>{
+    if(t.isTransfer) return false; // virements exclus des stats
     const d = new Date(t.date);
     const inPeriod = d>=start && d<=end;
     if(!accountId || accountId==='all') return inPeriod;
