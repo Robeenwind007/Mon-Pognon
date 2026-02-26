@@ -420,7 +420,7 @@
 <!-- TOP BAR -->
 <div class="topbar">
   <h1>Mon<span>Pognon</span></h1>
-  <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.4.6</div>
+  <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.4.7</div>
 </div>
 
 <!-- MAIN -->
@@ -741,7 +741,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '1.4.6';
+const APP_VERSION = '1.4.7';
 
 const DEFAULT_CATEGORIES = [
   { id:'salary',    label:'Salaire',      icon:'💼', color:'#10b981', system:true },
@@ -1078,7 +1078,14 @@ function renderAccountsManage() {
             transition:left .2s;"></span>
         </span>
       </label>`;
+    const idx   = db.accounts.indexOf(a);
+    const total = db.accounts.length;
+    const btnUp   = idx===0       ? `<span style="font-size:14px;line-height:1;color:var(--border)">▲</span>`
+                                  : `<span style="font-size:14px;line-height:1;cursor:pointer;color:var(--muted)" onclick="moveAccount('${a.id}',-1)">▲</span>`;
+    const btnDown = idx===total-1 ? `<span style="font-size:14px;line-height:1;color:var(--border)">▼</span>`
+                                  : `<span style="font-size:14px;line-height:1;cursor:pointer;color:var(--muted)" onclick="moveAccount('${a.id}',1)">▼</span>`;
     return `<div class="tx-item" style="${!included?'opacity:.6':''}">
+      <div style="display:flex;flex-direction:column;gap:2px;margin-right:6px">${btnUp}${btnDown}</div>
       <div class="tx-icon expense">${a.icon}</div>
       <div class="tx-info">
         <div class="tx-name">${a.name}</div>
@@ -1180,6 +1187,17 @@ function toggleAccountInclude(id) {
   const a = db.accounts.find(a=>a.id===id);
   if(!a) return;
   a.includeInTotal = (a.includeInTotal === false) ? true : false;
+  save(); renderAccountsManage(); renderDashboard();
+}
+
+function moveAccount(id, dir) {
+  const idx = db.accounts.findIndex(a=>a.id===id);
+  if(idx < 0) return;
+  const newIdx = idx + dir;
+  if(newIdx < 0 || newIdx >= db.accounts.length) return;
+  const tmp = db.accounts[idx];
+  db.accounts[idx] = db.accounts[newIdx];
+  db.accounts[newIdx] = tmp;
   save(); renderAccountsManage(); renderDashboard();
 }
 
