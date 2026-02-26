@@ -76,6 +76,24 @@
   .nav-item.active { color:var(--accent2); }
   .nav-item svg { width:20px; height:20px; }
 
+  /* ─── FAB ─── */
+  .fab {
+    position:fixed;
+    right:20px;
+    bottom:calc(env(safe-area-inset-bottom) + 72px);
+    width:58px; height:58px;
+    border-radius:18px;
+    background:var(--accent2);
+    border:none;
+    box-shadow:0 4px 20px rgba(99,102,241,.45);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    z-index:99;
+    transition:transform .15s, box-shadow .15s;
+  }
+  .fab:active { transform:scale(.93); box-shadow:0 2px 10px rgba(99,102,241,.3); }
+  .fab svg { width:28px; height:28px; stroke:#fff; }
+
   /* ─── CATÉGORIES PARAMÈTRES ─── */
   .cat-item {
     display:flex; align-items:center; gap:10px;
@@ -402,12 +420,6 @@
 <!-- TOP BAR -->
 <div class="topbar">
   <h1>Mon<span>Pognon</span></h1>
-  <div style="display:flex;gap:8px">
-    <div class="icon-btn" title="Nouveau compte" onclick="openSheet('account-sheet')" style="font-size:16px">🏦</div>
-    <div class="icon-btn" title="Nouvelle opération" onclick="openSheet('add-sheet')">
-      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="width:20px;height:20px"><path d="M12 5v14M5 12h14"/></svg>
-    </div>
-  </div>
 </div>
 
 <!-- MAIN -->
@@ -487,10 +499,6 @@
       <input type="date" id="tx-date">
     </div>
     <button class="btn btn-primary" onclick="addTransaction()">Enregistrer l'opération</button>
-
-    <div class="section-title" style="margin-top:24px">Gérer les comptes</div>
-    <div class="card" id="accounts-list-manage"></div>
-    <button class="btn btn-primary" onclick="openSheet('account-sheet')" style="margin-top:8px">+ Ajouter un compte</button>
   </div>
 
   <!-- ══ PAGE: RÉCURRENTS ══ -->
@@ -500,7 +508,13 @@
       <div style="font-size:12px;color:var(--muted);line-height:1.5">Ces charges sont déduites automatiquement chaque 1er du mois du compte désigné et entrent dans le calcul du solde théorique.</div>
     </div>
 
-    <div class="section-title">Charges en cours</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <div class="section-title" style="margin:0;flex:1">Charges en cours</div>
+      <select id="rec-filter-account" onchange="renderRecurring()"
+        style="font-size:12px;padding:5px 8px;border-radius:10px;background:var(--bg3);border:1px solid var(--border);color:var(--text);max-width:140px">
+        <option value="">Tous les comptes</option>
+      </select>
+    </div>
     <div id="recurring-list">
       <div class="empty-state"><span class="emoji">🔄</span><p>Aucune charge récurrente</p></div>
     </div>
@@ -564,7 +578,15 @@
 
   <!-- ══ PAGE: PARAMÈTRES ══ -->
   <div class="page" id="page-settings">
-    <div class="section-title" style="margin-top:0">Catégories</div>
+
+    <!-- ── COMPTES ── -->
+    <div class="section-title" style="margin-top:0">Comptes</div>
+    <div class="card" id="accounts-list-manage"></div>
+    <button class="btn btn-primary" onclick="openSheet('account-sheet')" style="margin-top:8px;width:100%">+ Créer un compte</button>
+
+    <div style="height:16px"></div>
+
+    <div class="section-title">Catégories</div>
     <div class="card" id="settings-categories-list"></div>
 
     <button class="btn btn-primary" onclick="openAddCategoryForm()" style="margin-top:8px">+ Ajouter une catégorie</button>
@@ -626,6 +648,11 @@
 </div>
 
 <!-- BOTTOM NAV -->
+<!-- FAB -->
+<button class="fab" onclick="openSheet('add-sheet')" title="Nouvelle opération">
+  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+</button>
+
 <nav class="bottom-nav">
   <div class="nav-item active" onclick="showPage('dashboard',this)">
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
@@ -830,9 +857,9 @@ function showPage(name, el) {
   document.getElementById('page-'+name).classList.add('active');
   if(el) el.classList.add('active');
   if(name==='stats') renderStats();
-  if(name==='saisie') { populateSelects(); renderAccountsManage(); }
+  if(name==='saisie') { populateSelects(); }
   if(name==='recurring') { populateSelects(); renderRecurring(); }
-  if(name==='settings') renderSettings();
+  if(name==='settings') { renderSettings(); renderAccountsManage(); }
 }
 
 // ════════════════════════════════════
@@ -918,7 +945,7 @@ function addAccount() {
   const balance = parseFloat(document.getElementById('acc-balance').value)||0;
   if(!name) { alert('Nom du compte obligatoire'); return; }
   const icon = ACCOUNT_TYPES[type]?.icon || selectedIcon;
-  db.accounts.push({ id: Date.now().toString(), name, icon, type, initialBalance: balance });
+  db.accounts.push({ id: Date.now().toString(), name, icon, type, initialBalance: balance, includeInTotal: true });
   save(); populateSelects(); renderDashboard(); renderAccountsManage(); closeSheet('account-sheet');
   document.getElementById('acc-name').value='';
   document.getElementById('acc-balance').value='';
@@ -953,6 +980,7 @@ function accountMonthBalance(accId) {
 
   // Charges récurrentes en attente (expense, hors virements)
   const pendingCharges = db.recurringCharges.filter(r=>{
+    if(r.active === false) return false;
     if(r.accountId !== accId) return false;
     if(r.type === 'transfer' || r.type === 'income') return false;
     return r.day > todayDay;
@@ -960,18 +988,21 @@ function accountMonthBalance(accId) {
 
   // Produits récurrents en attente (income)
   const pendingIncomes = db.recurringCharges.filter(r=>{
+    if(r.active === false) return false;
     if(r.accountId !== accId || r.type !== 'income') return false;
     return r.day > todayDay;
   });
 
   // Virements sortants en attente (impactent le solde du compte source)
   const pendingTransfersOut = db.recurringCharges.filter(r=>{
+    if(r.active === false) return false;
     if(r.accountId !== accId || r.type !== 'transfer') return false;
     return r.day > todayDay;
   });
 
   // Virements entrants en attente (impactent le solde du compte destination)
   const pendingTransfersIn = db.recurringCharges.filter(r=>{
+    if(r.active === false) return false;
     if(r.toAccountId !== accId || r.type !== 'transfer') return false;
     return r.day > todayDay;
   });
@@ -998,6 +1029,7 @@ function applyRecurringIfNeeded() {
   const todayDay = now.getDate();
 
   db.recurringCharges.forEach(r=>{
+    if(r.active === false) return; // désactivée
     if(r.day > todayDay) return; // pas encore le jour J
 
     // Clé unique pour ce mois : on la stocke dans applied[]
@@ -1041,24 +1073,52 @@ function applyRecurringIfNeeded() {
 
 function renderAccountsManage() {
   const el = document.getElementById('accounts-list-manage');
+  if(!el) return;
   if(!db.accounts.length) {
     el.innerHTML='<div class="empty-state"><span class="emoji">🏦</span><p>Aucun compte</p></div>'; return;
   }
   el.innerHTML = db.accounts.map(a=>{
-    const bal = accountBalance(a.id);
+    const bal      = accountBalance(a.id);
     const typeInfo = ACCOUNT_TYPES[a.type] || { label: a.type||'Compte', icon: a.icon };
-    return `<div class="tx-item">
+    const included = a.includeInTotal !== false;
+    const toggleSwitch = `
+      <label style="display:inline-flex;align-items:center;cursor:pointer" onclick="event.stopPropagation()">
+        <input type="checkbox" ${included?'checked':''} onchange="toggleAccountInclude('${a.id}')"
+          style="position:absolute;opacity:0;width:0;height:0">
+        <span style="
+          display:inline-block;width:34px;height:18px;border-radius:9px;
+          background:${included?'var(--accent)':'var(--bg3)'};
+          border:1.5px solid ${included?'var(--accent)':'var(--border)'};
+          position:relative;transition:background .2s;flex-shrink:0">
+          <span style="
+            position:absolute;top:2px;left:${included?'14px':'2px'};
+            width:12px;height:12px;border-radius:50%;
+            background:${included?'#fff':'var(--muted)'};
+            transition:left .2s;"></span>
+        </span>
+      </label>`;
+    return `<div class="tx-item" style="${!included?'opacity:.6':''}">
       <div class="tx-icon expense">${a.icon}</div>
       <div class="tx-info">
         <div class="tx-name">${a.name}</div>
-        <div class="tx-sub">${typeInfo.label} · Solde réel</div>
+        <div class="tx-sub">${typeInfo.label}${included?' · <span style="color:var(--green);font-size:10px">Inclus dans les totaux</span>':' · <span style="color:var(--muted);font-size:10px">Hors totaux</span>'}</div>
       </div>
-      <div style="text-align:right">
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
         <div class="tx-amount ${bal>=0?'income':'expense'}">${fmt(bal)}</div>
-        <div style="font-size:10px;color:var(--muted);margin-top:2px;cursor:pointer" onclick="deleteAccount('${a.id}')">🗑 Supprimer</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          ${toggleSwitch}
+          <span style="font-size:10px;color:var(--red);cursor:pointer" onclick="deleteAccount('${a.id}')">🗑</span>
+        </div>
       </div>
     </div>`;
   }).join('');
+}
+
+function toggleAccountInclude(id) {
+  const a = db.accounts.find(a=>a.id===id);
+  if(!a) return;
+  a.includeInTotal = (a.includeInTotal === false) ? true : false;
+  save(); renderAccountsManage(); renderDashboard();
 }
 
 // ════════════════════════════════════
@@ -1276,7 +1336,7 @@ function addRecurring() {
 
   db.recurringCharges.push({
     id: Date.now().toString(), label, amount, accountId, category, day,
-    type: currentRecType,
+    type: currentRecType, active: true,
     ...(isTransfer ? { toAccountId } : {})
   });
   save(); renderRecurring(); renderDashboard(); closeSheet('recurring-sheet');
@@ -1287,22 +1347,160 @@ function addRecurring() {
 }
 
 function deleteRecurring(id) {
-  if(!confirm('Supprimer cette charge ?')) return;
+  if(!confirm('Supprimer cette opération récurrente ?')) return;
   db.recurringCharges = db.recurringCharges.filter(r=>r.id!==id);
   save(); renderRecurring(); renderDashboard();
 }
 
+function toggleRecurring(id) {
+  const r = db.recurringCharges.find(r=>r.id===id);
+  if(!r) return;
+  r.active = (r.active === false) ? true : false;
+  save(); renderRecurring(); renderDashboard();
+}
+
+function openEditRecurring(id) {
+  const r = db.recurringCharges.find(r=>r.id===id);
+  if(!r) return;
+
+  const old = document.getElementById('edit-rec-modal');
+  if(old) old.remove();
+
+  const isTransfer = r.type === 'transfer';
+  const isIncome   = r.type === 'income';
+
+  const accOptions = db.accounts.map(a =>
+    `<option value="${a.id}" ${a.id===r.accountId?'selected':''}>${a.icon} ${a.name}</option>`
+  ).join('');
+  const accOptionsTo = db.accounts.map(a =>
+    `<option value="${a.id}" ${a.id===r.toAccountId?'selected':''}>${a.icon} ${a.name}</option>`
+  ).join('');
+  const catOptions = getCategories().map(c =>
+    `<option value="${c.id}" ${c.id===r.category?'selected':''}>${c.icon} ${c.label}</option>`
+  ).join('');
+
+  const modal = document.createElement('div');
+  modal.id = 'edit-rec-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:flex-end;padding:0';
+
+  const typeLabel = isIncome ? '+ Produit' : isTransfer ? '⇄ Virement' : '− Charge';
+  const typeBadgeColor = isIncome ? 'rgba(16,185,129,.15)' : isTransfer ? 'rgba(59,130,246,.12)' : 'rgba(244,63,94,.12)';
+  const typeBadgeText  = isIncome ? 'var(--green)' : isTransfer ? 'var(--accent)' : 'var(--red)';
+
+  modal.innerHTML = `
+    <div style="background:var(--bg2);border-radius:20px 20px 0 0;width:100%;padding:20px;box-sizing:border-box;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:15px;font-weight:700;color:var(--text)">Modifier</span>
+          <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;background:${typeBadgeColor};color:${typeBadgeText}">${typeLabel}</span>
+        </div>
+        <button onclick="document.getElementById('edit-rec-modal').remove()" style="background:var(--bg3);border:none;color:var(--muted);font-size:18px;padding:4px 10px;border-radius:8px;cursor:pointer">✕</button>
+      </div>
+
+      <div class="form-group" style="margin-bottom:0">
+        <label>Libellé</label>
+        <input type="text" id="edit-rec-label" value="${r.label}" maxlength="50">
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>Montant (€)</label>
+        <input type="number" id="edit-rec-amount" value="${r.amount}" step="0.01" inputmode="decimal">
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>${isIncome ? 'Compte crédité' : isTransfer ? 'Compte source' : 'Compte débité'}</label>
+        <select id="edit-rec-account">${accOptions}</select>
+      </div>
+      ${isTransfer ? `
+      <div class="form-group" style="margin-bottom:0">
+        <label>Compte crédité</label>
+        <select id="edit-rec-account-to">${accOptionsTo}</select>
+      </div>` : ''}
+      ${!isTransfer ? `
+      <div class="form-group" style="margin-bottom:0">
+        <label>Catégorie</label>
+        <select id="edit-rec-category">${catOptions}</select>
+      </div>` : ''}
+      <div class="form-group" style="margin-bottom:0">
+        <label>${isIncome ? 'Jour de versement' : 'Jour de prélèvement'}</label>
+        <input type="number" id="edit-rec-day" value="${r.day}" min="1" max="31" inputmode="numeric">
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button onclick="saveEditRecurring('${r.id}')" class="btn btn-primary" style="flex:1">Enregistrer</button>
+        <button onclick="document.getElementById('edit-rec-modal').remove()" class="btn" style="flex:0 0 auto;background:var(--bg3);color:var(--muted);border:none">Annuler</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+}
+
+function saveEditRecurring(id) {
+  const r = db.recurringCharges.find(r=>r.id===id);
+  if(!r) return;
+
+  const label  = document.getElementById('edit-rec-label').value.trim();
+  const amount = parseFloat(document.getElementById('edit-rec-amount').value);
+  const accountId = document.getElementById('edit-rec-account').value;
+  const day    = parseInt(document.getElementById('edit-rec-day').value)||1;
+
+  if(!label || !amount || !accountId) { alert('Remplissez tous les champs'); return; }
+
+  r.label     = label;
+  r.amount    = amount;
+  r.accountId = accountId;
+  r.day       = day;
+
+  const isTransfer = r.type === 'transfer';
+  if(isTransfer) {
+    const toAccountId = document.getElementById('edit-rec-account-to').value;
+    if(!toAccountId || toAccountId === accountId) { alert('Choisissez un compte destinataire différent'); return; }
+    r.toAccountId = toAccountId;
+  } else {
+    r.category = document.getElementById('edit-rec-category').value;
+  }
+
+  save();
+  document.getElementById('edit-rec-modal').remove();
+  renderRecurring(); renderDashboard();
+}
+
 function renderRecurring() {
   const el = document.getElementById('recurring-list');
+  const todayDay = new Date().getDate();
+
+  // Alimenter le select filtre compte
+  const filterSel = document.getElementById('rec-filter-account');
+  if(filterSel) {
+    const currentFilter = filterSel.value;
+    filterSel.innerHTML = '<option value="">Tous les comptes</option>' +
+      db.accounts.map(a => `<option value="${a.id}" ${a.id===currentFilter?'selected':''}>${a.icon} ${a.name}</option>`).join('');
+    filterSel.value = currentFilter;
+  }
+  const filterAccId = filterSel ? filterSel.value : '';
+
   if(!db.recurringCharges.length) {
     el.innerHTML='<div class="empty-state"><span class="emoji">🔄</span><p>Aucune opération récurrente</p></div>'; return;
   }
-  const todayDay = new Date().getDate();
-  const totalCharges = db.recurringCharges.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amount,0);
-  const totalIncomes = db.recurringCharges.filter(r=>r.type==='income').reduce((s,r)=>s+r.amount,0);
+
+  // Appliquer filtre compte (source OU destination pour les virements)
+  const list = filterAccId
+    ? db.recurringCharges.filter(r => r.accountId===filterAccId || r.toAccountId===filterAccId)
+    : db.recurringCharges;
+
+  if(!list.length) {
+    el.innerHTML='<div class="empty-state"><span class="emoji">🔍</span><p>Aucune opération pour ce compte</p></div>'; return;
+  }
+
+  // TOTAL CHARGES/PRODUITS actifs = toutes les actives filtrées du mois (booléen à 1)
+  const totalCharges = list.filter(r=>r.type==='expense' && r.active!==false).reduce((s,r)=>s+r.amount,0);
+  const totalIncomes = list.filter(r=>r.type==='income'  && r.active!==false).reduce((s,r)=>s+r.amount,0);
+
+  // SOLDE RÉCURRENT NET = actives filtrées dont le jour est > aujourd'hui (reste du mois)
+  const netCharges = list.filter(r=>r.type==='expense' && r.active!==false && r.day>todayDay && db.accounts.find(a=>a.id===r.accountId)?.includeInTotal!==false).reduce((s,r)=>s+r.amount,0);
+  const netIncomes = list.filter(r=>r.type==='income'  && r.active!==false && r.day>todayDay && db.accounts.find(a=>a.id===r.accountId)?.includeInTotal!==false).reduce((s,r)=>s+r.amount,0);
+  const netBalance = netIncomes - netCharges;
 
   // Trier : produits d'abord, puis charges, puis virements — puis par jour
-  const sorted = [...db.recurringCharges].sort((a,b)=>{
+  const sorted = [...list].sort((a,b)=>{
     const order = {income:0, expense:1, transfer:2};
     if(order[a.type] !== order[b.type]) return order[a.type]-order[b.type];
     return a.day - b.day;
@@ -1315,27 +1513,50 @@ function renderRecurring() {
     const isTransfer = r.type === 'transfer';
     const isIncome   = r.type === 'income';
     const passed   = r.day <= todayDay;
+    const isActive = r.active !== false;
 
     const subText = isTransfer
       ? `${acc?acc.icon+' '+acc.name:'?'} → ${toAcc?toAcc.icon+' '+toAcc.name:'?'}`
       : `${acc?acc.icon+' '+acc.name:'?'} · <span style="color:${cat.color}">${cat.icon} ${cat.label}</span>`;
 
-    const amtStyle = isTransfer
-      ? 'color:var(--accent)'
-      : isIncome
-        ? (passed ? 'color:var(--muted)' : 'color:var(--green)')
-        : (passed ? 'color:var(--muted)' : 'color:var(--red)');
+    const amtStyle = !isActive
+      ? 'color:var(--muted)'
+      : isTransfer
+        ? 'color:var(--accent)'
+        : isIncome
+          ? (passed ? 'color:var(--muted)' : 'color:var(--green)')
+          : (passed ? 'color:var(--muted)' : 'color:var(--red)');
     const amtPrefix = isTransfer ? '⇄' : isIncome ? '+' : '-';
     const typeLabel = isIncome ? '+ Produit' : isTransfer ? '⇄ Virement' : '− Charge';
     const typeBadgeColor = isIncome ? 'rgba(16,185,129,.15)' : isTransfer ? 'rgba(59,130,246,.12)' : 'rgba(244,63,94,.12)';
     const typeBadgeText  = isIncome ? 'var(--green)' : isTransfer ? 'var(--accent)' : 'var(--red)';
 
-    const statusDot = passed
-      ? `<span style="font-size:10px;color:var(--green);font-weight:600">✓ passé${isIncome?'':'e'}</span>`
-      : `<span style="font-size:10px;color:var(--orange);font-weight:600">⏳ à venir</span>`;
+    const statusDot = !isActive
+      ? `<span style="font-size:10px;color:var(--muted);font-weight:600">⏸ inactif</span>`
+      : passed
+        ? `<span style="font-size:10px;color:var(--green);font-weight:600">✓ passé${isIncome?'':'e'}</span>`
+        : `<span style="font-size:10px;color:var(--orange);font-weight:600">⏳ à venir</span>`;
 
-    return `<div class="recurring-item" style="${passed?'opacity:.65':''}">
-      <div class="rec-day" style="background:${passed?'rgba(16,185,129,.1)':'rgba(245,158,11,.1)'};color:${passed?'var(--green)':'var(--orange)'}">
+    // Toggle switch HTML
+    const toggleSwitch = `
+      <label style="display:inline-flex;align-items:center;cursor:pointer;gap:0" onclick="event.stopPropagation()">
+        <input type="checkbox" ${isActive?'checked':''} onchange="toggleRecurring('${r.id}')"
+          style="position:absolute;opacity:0;width:0;height:0">
+        <span style="
+          display:inline-block;width:36px;height:20px;border-radius:10px;
+          background:${isActive?'var(--accent)':'var(--bg3)'};
+          border:1.5px solid ${isActive?'var(--accent)':'var(--border)'};
+          position:relative;transition:background .2s;flex-shrink:0">
+          <span style="
+            position:absolute;top:2px;left:${isActive?'16px':'2px'};
+            width:14px;height:14px;border-radius:50%;
+            background:${isActive?'#fff':'var(--muted)'};
+            transition:left .2s;"></span>
+        </span>
+      </label>`;
+
+    return `<div class="recurring-item" style="${!isActive?'opacity:.5':''}">
+      <div class="rec-day" style="background:${!isActive?'rgba(148,163,184,.1)':passed?'rgba(16,185,129,.1)':'rgba(245,158,11,.1)'};color:${!isActive?'var(--muted)':passed?'var(--green)':'var(--orange)'}">
         <span>${r.day}</span><span>du mois</span>
       </div>
       <div class="rec-info">
@@ -1346,25 +1567,32 @@ function renderRecurring() {
         <div class="rec-sub">${subText}</div>
         <div style="margin-top:3px">${statusDot}</div>
       </div>
-      <div style="text-align:right">
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
         <div class="rec-amt" style="${amtStyle}">${amtPrefix}${fmt(r.amount)}</div>
-        <div style="font-size:10px;color:var(--muted);cursor:pointer;margin-top:4px" onclick="deleteRecurring('${r.id}')">🗑</div>
+        ${toggleSwitch}
+        <div style="display:flex;gap:8px;margin-top:2px">
+          <span style="font-size:10px;color:var(--accent);cursor:pointer" onclick="openEditRecurring('${r.id}')">✏️</span>
+          <span style="font-size:10px;color:var(--muted);cursor:pointer" onclick="deleteRecurring('${r.id}')">🗑</span>
+        </div>
       </div>
     </div>`;
   }).join('') + `
   <div style="padding:12px 0;border-top:1px solid var(--border)">
     ${totalIncomes>0?`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <span style="font-size:12px;color:var(--muted)">Total produits</span>
+      <span style="font-size:12px;color:var(--muted)">Total produits actifs</span>
       <span style="font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--green)">+${fmt(totalIncomes)}</span>
     </div>`:''}
     ${totalCharges>0?`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <span style="font-size:12px;color:var(--muted)">Total charges</span>
+      <span style="font-size:12px;color:var(--muted)">Total charges actives</span>
       <span style="font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--red)">-${fmt(totalCharges)}</span>
     </div>`:''}
     <div style="display:flex;justify-content:space-between;align-items:center;padding-top:6px;border-top:1px solid var(--border)">
-      <span style="font-size:13px;font-weight:700">Solde récurrent net</span>
-      <span style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:${(totalIncomes-totalCharges)>=0?'var(--green)':'var(--red)'}">
-        ${(totalIncomes-totalCharges)>=0?'+':''}${fmt(totalIncomes-totalCharges)}
+      <div>
+        <span style="font-size:13px;font-weight:700">Solde récurrent net</span>
+        <div style="font-size:10px;color:var(--muted);margin-top:1px">Du ${new Date().getDate()} au ${new Date(new Date().getFullYear(), new Date().getMonth()+1, 0).getDate()} du mois</div>
+      </div>
+      <span style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:${netBalance>=0?'var(--green)':'var(--red)'}">
+        ${netBalance>=0?'+':''}${fmt(netBalance)}
       </span>
     </div>
   </div>`;
@@ -1377,18 +1605,18 @@ function renderDashboard() {
   const now = new Date();
   const todayDay = now.getDate();
 
-  const totalReal  = db.accounts.reduce((s,a)=>s+accountBalance(a.id),0);
-  const totalMonth = db.accounts.reduce((s,a)=>s+accountMonthBalance(a.id),0);
+  const totalReal  = db.accounts.filter(a=>a.includeInTotal!==false).reduce((s,a)=>s+accountBalance(a.id),0);
+  const totalMonth = db.accounts.filter(a=>a.includeInTotal!==false).reduce((s,a)=>s+accountMonthBalance(a.id),0);
 
-  // Opérations récurrentes restantes ce mois (jour > aujourd'hui)
-  const pendingCharges = db.recurringCharges.filter(r=>r.type==='expense' && r.day>todayDay);
-  const pendingIncomes = db.recurringCharges.filter(r=>r.type==='income'  && r.day>todayDay);
+  // Opérations récurrentes restantes ce mois (jour > aujourd'hui, actives uniquement)
+  const pendingCharges = db.recurringCharges.filter(r=>r.active!==false && r.type==='expense' && r.day>todayDay);
+  const pendingIncomes = db.recurringCharges.filter(r=>r.active!==false && r.type==='income'  && r.day>todayDay);
   const totalPendingOut = pendingCharges.reduce((s,r)=>s+r.amount,0);
   const totalPendingIn  = pendingIncomes.reduce((s,r)=>s+r.amount,0);
   const totalPending    = totalPendingOut - totalPendingIn; // net
 
-  // Prochain événement récurrent à venir (charge ou produit)
-  const pendingAll  = db.recurringCharges.filter(r=>r.type!=='transfer' && r.day>todayDay);
+  // Prochain événement récurrent à venir (charge ou produit, actif)
+  const pendingAll  = db.recurringCharges.filter(r=>r.active!==false && r.type!=='transfer' && r.day>todayDay);
   const nextCharge  = [...pendingAll].sort((a,b)=>a.day-b.day)[0];
 
   document.getElementById('total-real').textContent  = fmt(totalReal);
@@ -1725,7 +1953,7 @@ function onbCreateAccount() {
     return;
   }
   const icon = ACCOUNT_TYPES[type]?.icon || onbSelectedIcon;
-  db.accounts.push({ id: Date.now().toString(), name, icon, type, initialBalance: balance });
+  db.accounts.push({ id: Date.now().toString(), name, icon, type, initialBalance: balance, includeInTotal: true });
   save();
   document.getElementById('onboarding').classList.remove('visible');
   populateSelects();
