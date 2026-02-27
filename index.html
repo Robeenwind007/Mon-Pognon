@@ -456,7 +456,7 @@
 <div class="topbar">
   <h1>Auto<span>Thunes</span></h1>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px">
-    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.8.2</div>
+    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.8.3</div>
     <div style="display:flex;align-items:center;gap:6px">
       <div id="sync-status" style="font-size:10px;color:var(--muted)">…</div>
       <span onclick="forceSync()" title="Forcer la synchronisation"
@@ -877,7 +877,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '1.8.2';
+const APP_VERSION = '1.8.3';
 
 const DEFAULT_CATEGORIES = [
   { id:'salary',    label:'Salaire',      icon:'💼', color:'#10b981', system:true },
@@ -2065,14 +2065,14 @@ function renderDashboard() {
   }
 
   // 5 prochaines opérations à venir (récurrentes actives dont le jour > aujourd'hui)
+  const yr  = now.getFullYear();
+  const mo  = String(now.getMonth()+1).padStart(2,'0');
+  const monthKey = `${yr}-${mo}`;
+
   const upcoming = db.recurringCharges
     .filter(r => r.active !== false && r.day > todayDay && isRecurringStarted(r, monthKey))
     .sort((a,b) => a.day - b.day)
     .slice(0, 5);
-
-  const yr  = now.getFullYear();
-  const mo  = String(now.getMonth()+1).padStart(2,'0');
-  const monthKey = `${yr}-${mo}`;
 
   const upEl = document.getElementById('upcoming-tx-list');
   if(!upcoming.length) {
