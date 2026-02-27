@@ -1,36 +1,45 @@
 # MonPognon 💰
 
-**v1.4.9** — Application de gestion financière personnelle pour iPhone.  
-Fichier HTML unique — aucune installation, aucun serveur, aucune dépendance.
+**v1.5.8** — Application de gestion financière personnelle pour iPhone et Mac.  
+Fichier HTML unique — aucune installation, aucun serveur, aucune dépendance.  
+Synchronisation automatique entre appareils via Supabase.
 
 ---
 
-## Installation sur iPhone
+## Installation
 
-### Via GitHub Pages (recommandé)
-1. Héberger `index.html` sur un dépôt GitHub public
-2. Activer GitHub Pages : Settings → Pages → Branch: main → Save
-3. Ouvrir l'URL générée dans **Safari** sur iPhone
-4. Bouton **Partager** ↑ → **"Sur l'écran d'accueil"** → Ajouter
+### Sur iPhone (Safari)
+1. Ouvrir l'URL GitHub Pages dans **Safari**
+2. Bouton **Partager** ↑ → **"Sur l'écran d'accueil"** → Ajouter
+3. L'app s'ouvre en plein écran comme une app native
 
-L'app s'ouvre en plein écran comme une app native, avec icône personnalisée.
+### Sur Mac (Chrome ou Safari)
+1. Ouvrir la même URL dans le navigateur
+2. Utiliser directement dans le navigateur
 
-### En local (Mac → iPhone via AirDrop)
-1. Envoyer `index.html` par AirDrop
-2. Ouvrir avec Safari → même procédure qu'au-dessus
+---
+
+## Synchronisation entre appareils
+
+Les données se synchronisent automatiquement via **Supabase** :
+- À chaque modification → push vers Supabase (1.5s de délai)
+- Au démarrage → pull depuis Supabase (source de vérité)
+- Hors ligne → localStorage utilisé en cache
+
+Un indicateur en haut à droite affiche l'état : `✓ synchronisé` / `↓ chargement…` / `⚠ hors ligne`
 
 ---
 
 ## Navigation
 
-4 onglets principaux + bouton FAB (➕ bas droite) pour saisir rapidement :
+4 onglets + bouton FAB (➕ bas droite) pour saisir rapidement :
 
 | Onglet | Contenu |
 |---|---|
 | 📊 Tableau | Soldes, dernières opérations, opérations à venir |
 | 📋 Opérations | Historique complet avec filtres |
 | 📈 Stats | Graphiques par période et catégorie |
-| ⚙️ Paramètres | Comptes, récurrentes, catégories, sauvegarde |
+| ⚙️ Paramètres | Comptes, récurrentes, apparence, sauvegarde |
 
 ---
 
@@ -39,91 +48,78 @@ L'app s'ouvre en plein écran comme une app native, avec icône personnalisée.
 ### 📊 Tableau de bord
 
 **Trois indicateurs globaux :**
-- **Solde à date** — total des comptes inclus, toutes transactions passées
-- **Fin de mois estimée** — solde à date + récurrentes actives non pointées restantes
-- **Solde récurrent net** — charges/produits actifs, non pointés, à venir ce mois (comptes inclus uniquement)
+- **Solde à date** — total des comptes inclus, transactions passées
+- **Fin de mois estimée** — solde + récurrentes actives non pointées restantes
+- **Solde récurrent net** — charges/produits actifs, non pointés, à venir ce mois
 
-**Par compte :**
-- Solde réel à date
-- Solde "en cours" (avec transactions futures saisies)
-- Fin de mois estimée
+**Par compte :** solde réel / en cours / fin de mois
 
 **Dernières opérations** — 3 dernières transactions passées
 
-**Opérations à venir** — 5 prochaines récurrentes actives ce mois, triées par jour, avec :
+**Opérations à venir** — 5 prochaines récurrentes actives, avec :
 - Badge **J-X** (jours restants)
-- Case **"Comptabilisé"** : cocher pour exclure du Solde récurrent net (pointage mensuel, se remet à zéro le mois suivant)
+- Case **"Comptabilisé"** — cocher pour exclure du Solde récurrent net (remise à zéro mensuelle automatique)
 
 ---
 
 ### ➕ Saisie rapide (FAB)
-
-Accessible depuis tous les onglets via le bouton ➕ en bas à droite.
-
-- **3 types** : Recette / Dépense / ⇄ Virement
-- **Libellés intelligents** : autocomplétion sur l'historique, sauvegarde à la volée, catégorie auto-associée
-- Date modifiable
+- 3 types : Recette / Dépense / ⇄ Virement
+- Libellés intelligents avec autocomplétion et catégorie auto-associée
 
 ---
 
 ### 📋 Opérations
-
-Toutes les opérations saisies (non récurrentes), triées par date décroissante.
-
-- Groupées par mois avec **solde net mensuel**
-- **Filtre par compte** et par type (Recette / Dépense / Virement)
-- Virements affichés comme ligne unique (jambe sortante)
-- Suppression à la ligne (virements : suppression des deux jambes)
+- Toutes les opérations saisies, triées par date décroissante
+- Groupées par mois avec solde net mensuel
+- Filtre par compte et par type
+- Suppression avec confirmation
 
 ---
 
 ### 📈 Stats
-
-- **Filtre par compte** ou situation globale
-- **Périodes** : Mois / Trimestre / Année avec navigation ‹ ›
-- Recettes et dépenses (**virements exclus** — mouvements internes)
-- **Graphique donut** par catégorie de dépenses
-- **Histogramme** des 6 derniers mois (recettes vs dépenses)
-- Détail par catégorie avec barres de progression
+- Filtre par compte ou global
+- Périodes : Mois / Trimestre / Année avec navigation
+- Virements exclus (mouvements internes)
+- Donut par catégorie + histogramme 6 mois
 
 ---
 
 ### ⚙️ Paramètres
 
 #### Comptes
-- **Types** : Courant, PEL, LDD, Livret A, PEA, LLD, Compte Carte (icône auto)
-- **Réordonner** avec ▲▼ — l'ordre est respecté dans le tableau de bord
-- **Modifier** : nom, type, solde initial, icône (bouton ✏️)
-- **Toggle "Inclus dans les totaux"** : exclure un compte du Solde à date, Fin de mois et Solde récurrent net
-- **Supprimer** (supprime aussi les transactions et récurrentes associées)
+- Types : Courant, PEL, LDD, Livret A, PEA, LLD, Compte Carte
+- **Réordonner** avec ▲▼
+- **Modifier** : nom, type, solde initial, icône (✏️)
+- **Toggle "Inclus dans les totaux"** : exclure des soldes globaux
+- Suppression avec confirmation
 
 #### Opérations récurrentes
-- **3 types** : Charge / Produit / ⇄ Virement
-- **Jour** de prélèvement/versement exact dans le mois
-- **Toggle actif/inactif** — les inactives sont grisées et exclues des calculs
-- **Modifier** : libellé, montant, compte, catégorie, jour (bouton ✏️)
-- **Filtre par compte** (virements inclus si compte source ou destination)
-- **Totaux** : charges actives du mois / produits actifs / solde récurrent net (non pointés, à venir)
-- Application automatique au 1er du mois
+- Types : Charge / Produit / ⇄ Virement
+- Toggle actif/inactif, modification complète
+- Filtre par compte
+- Totaux actifs + solde récurrent net
+
+#### Apparence
+- **🌙 Sombre** — thème bleu nuit (défaut)
+- **☀️ Clair** — fond blanc/gris
+- **⚙️ Système** — suit automatiquement le mode de l'appareil
 
 #### Catégories
-- 9 catégories système prédéfinies (non supprimables)
-- Ajout de catégories personnalisées avec emoji et couleur
-- Suppression des catégories personnalisées
+- 9 catégories système + catégories personnalisées (emoji + couleur)
 
 #### Sauvegarde & Restauration
-- **Export JSON** : fichier horodaté téléchargeable (copie dans le presse-papier sur iOS)
-- **Import JSON** : restauration complète avec modal de confirmation
-- Aucune donnée envoyée sur internet
+- Export JSON horodaté (backup manuel)
+- Import JSON avec confirmation
 
 ---
 
 ## Données & confidentialité
 
-Toutes les données sont stockées **localement** dans le `localStorage` de Safari.  
-Clé de stockage : `mc_data_v2`
+- **Supabase** : données stockées dans un projet personnel, aucun tiers n'y a accès
+- **localStorage** : cache local pour le mode hors ligne
+- Aucune publicité, aucun tracking
 
-> ⚠️ **Important** : supprimer l'app de l'écran d'accueil **efface les données**. Exportez régulièrement via Paramètres → Sauvegarde.
+> ⚠️ Exportez régulièrement via Paramètres → Sauvegarde en backup de sécurité.
 
 ---
 
@@ -136,51 +132,4 @@ moncompte/
 ├── README.md           ← Ce fichier
 ├── CHANGELOG.md        ← Historique des versions
 └── BACKLOG.md          ← Idées & évolutions futures
-```
-
----
-
-## Modèle de données
-
-```json
-{
-  "accounts": [
-    {
-      "id": "1700000000000",
-      "name": "LCL Courant",
-      "icon": "🏦",
-      "type": "courant",
-      "initialBalance": 1500,
-      "includeInTotal": true
-    }
-  ],
-  "transactions": [
-    {
-      "id": "1700000000001",
-      "label": "Courses",
-      "amount": 85.50,
-      "accountId": "1700000000000",
-      "category": "food",
-      "date": "2026-02-15",
-      "type": "expense",
-      "isRecurring": false
-    }
-  ],
-  "recurringCharges": [
-    {
-      "id": "1700000000002",
-      "label": "Loyer",
-      "amount": 900,
-      "accountId": "1700000000000",
-      "category": "housing",
-      "day": 5,
-      "type": "expense",
-      "active": true,
-      "pointed": { "2026-02": true },
-      "applied": ["2026-02"]
-    }
-  ],
-  "categories": [],
-  "labels": []
-}
 ```

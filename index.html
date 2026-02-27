@@ -62,6 +62,7 @@
     }
   }
 
+  @keyframes spin { to { transform: rotate(360deg); } }
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 
   body {
@@ -455,8 +456,12 @@
 <div class="topbar">
   <h1>Mon<span>Pognon</span></h1>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px">
-    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.5.7</div>
-    <div id="sync-status" style="font-size:10px;color:var(--muted)">…</div>
+    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.5.8</div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <div id="sync-status" style="font-size:10px;color:var(--muted)">…</div>
+      <span onclick="forceSync()" title="Forcer la synchronisation"
+        style="font-size:14px;cursor:pointer;opacity:.7;transition:opacity .2s" id="sync-btn">🔄</span>
+    </div>
   </div>
 </div>
 
@@ -806,7 +811,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '1.5.7';
+const APP_VERSION = '1.5.8';
 
 const DEFAULT_CATEGORIES = [
   { id:'salary',    label:'Salaire',      icon:'💼', color:'#10b981', system:true },
@@ -2612,6 +2617,20 @@ function applyTheme(theme) {
 function setTheme(theme) {
   localStorage.setItem('mp_theme', theme);
   applyTheme(theme);
+}
+
+async function forceSync() {
+  const btn = document.getElementById('sync-btn');
+  if(btn) btn.style.animation = 'spin .7s linear infinite';
+  await syncPush();
+  const pulled = await syncPull();
+  if(pulled) {
+    populateSelects(); applyRecurringIfNeeded();
+    renderDashboard(); renderAccountsManage();
+    renderRecurring(); renderStats();
+    renderSettings(); renderOperations();
+  }
+  if(btn) btn.style.animation = '';
 }
 
 // ════════════════════════════════════
