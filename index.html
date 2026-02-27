@@ -456,7 +456,7 @@
 <div class="topbar">
   <h1>Mon<span>Pognon</span></h1>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px">
-    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.5.9</div>
+    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.7.0</div>
     <div style="display:flex;align-items:center;gap:6px">
       <div id="sync-status" style="font-size:10px;color:var(--muted)">…</div>
       <span onclick="forceSync()" title="Forcer la synchronisation"
@@ -658,6 +658,65 @@
       </div>
     </div>
 
+    <!-- ══ PRÊTS ══ -->
+    <div style="height:16px"></div>
+    <div class="section-title">Prêts</div>
+    <div id="loans-list"></div>
+    <button class="btn btn-primary" onclick="openLoanForm()" style="margin-top:8px;width:100%">+ Ajouter un prêt</button>
+
+    <!-- Formulaire ajout prêt -->
+    <div id="loan-form" style="display:none;margin-top:12px">
+      <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+        <div style="font-size:14px;font-weight:600;color:var(--text)">Nouveau prêt</div>
+        <div class="form-group" style="margin-bottom:0">
+          <label>Libellé</label>
+          <input type="text" id="loan-label" placeholder="Ex: Prêt immo, Auto…" maxlength="40">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label>Compte prélevé</label>
+          <select id="loan-account"></select>
+        </div>
+        <div style="display:flex;gap:8px">
+          <div class="form-group" style="margin-bottom:0;flex:1">
+            <label>Date début</label>
+            <input type="date" id="loan-start">
+          </div>
+          <div class="form-group" style="margin-bottom:0;flex:1">
+            <label>1ère échéance</label>
+            <input type="date" id="loan-first-payment">
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label>Jour de prélèvement mensuel</label>
+          <input type="number" id="loan-day" min="1" max="28" placeholder="5">
+        </div>
+        <div style="display:flex;gap:8px">
+          <div class="form-group" style="margin-bottom:0;flex:1">
+            <label>Montant emprunté (€)</label>
+            <input type="number" id="loan-amount" step="0.01" placeholder="150000">
+          </div>
+          <div class="form-group" style="margin-bottom:0;flex:1">
+            <label>Durée (mois)</label>
+            <input type="number" id="loan-duration" placeholder="240">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <div class="form-group" style="margin-bottom:0;flex:1">
+            <label>Mensualité (€)</label>
+            <input type="number" id="loan-monthly" step="0.01" placeholder="850">
+          </div>
+          <div class="form-group" style="margin-bottom:0;flex:1">
+            <label>dont Assurance (€)</label>
+            <input type="number" id="loan-insurance" step="0.01" placeholder="35">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" onclick="saveLoan()" style="flex:1">Créer le prêt</button>
+          <button class="btn" onclick="closeLoanForm()" style="flex:0 0 auto;background:var(--bg3);color:var(--muted);border:none">Annuler</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ══ SAUVEGARDE & RESTAURATION ══ -->
     <div class="section-title">Sauvegarde & Restauration</div>
     <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:12px">
@@ -811,7 +870,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '1.5.9';
+const APP_VERSION = '1.7.0';
 
 const DEFAULT_CATEGORIES = [
   { id:'salary',    label:'Salaire',      icon:'💼', color:'#10b981', system:true },
@@ -863,6 +922,7 @@ function init() {
   applyTheme(localStorage.getItem('mp_theme') || 'dark');
   // Migration : si db sans categories, on injecte les défauts
   if(!db.categories) { db.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)); save(); }
+  if(!db.loans) { db.loans = []; }
   fillDateFields();
   populateSelects();
   applyRecurringIfNeeded();
@@ -912,7 +972,7 @@ function showPage(name, el) {
   if(el) el.classList.add('active');
   if(name==='stats') renderStats();
   if(name==='saisie') { renderOperations(); }
-  if(name==='settings') { renderSettings(); renderAccountsManage(); renderRecurring(); applyTheme(localStorage.getItem('mp_theme') || 'dark'); }
+  if(name==='settings') { renderSettings(); renderAccountsManage(); renderRecurring(); renderLoans(); applyTheme(localStorage.getItem('mp_theme') || 'dark'); }
 }
 
 // ════════════════════════════════════
@@ -1029,9 +1089,8 @@ function accountBalance(accId) {
 function accountMonthBalance(accId) {
   // Solde fin de mois = solde réel + récurrentes du mois pas encore passées
   const now = new Date();
-  const yr  = now.getFullYear();
-  const mo  = now.getMonth();
   const todayDay = now.getDate();
+  const monthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   const real = accountBalance(accId);
 
   // Charges récurrentes en attente (expense, hors virements)
@@ -1039,6 +1098,7 @@ function accountMonthBalance(accId) {
     if(r.active === false) return false;
     if(r.accountId !== accId) return false;
     if(r.type === 'transfer' || r.type === 'income') return false;
+    if(!isRecurringStarted(r, monthKey)) return false;
     return r.day > todayDay;
   });
 
@@ -1046,20 +1106,23 @@ function accountMonthBalance(accId) {
   const pendingIncomes = db.recurringCharges.filter(r=>{
     if(r.active === false) return false;
     if(r.accountId !== accId || r.type !== 'income') return false;
+    if(!isRecurringStarted(r, monthKey)) return false;
     return r.day > todayDay;
   });
 
-  // Virements sortants en attente (impactent le solde du compte source)
+  // Virements sortants en attente
   const pendingTransfersOut = db.recurringCharges.filter(r=>{
     if(r.active === false) return false;
     if(r.accountId !== accId || r.type !== 'transfer') return false;
+    if(!isRecurringStarted(r, monthKey)) return false;
     return r.day > todayDay;
   });
 
-  // Virements entrants en attente (impactent le solde du compte destination)
+  // Virements entrants en attente
   const pendingTransfersIn = db.recurringCharges.filter(r=>{
     if(r.active === false) return false;
     if(r.toAccountId !== accId || r.type !== 'transfer') return false;
+    if(!isRecurringStarted(r, monthKey)) return false;
     return r.day > todayDay;
   });
 
@@ -1633,6 +1696,12 @@ function saveEditRecurring(id) {
   renderRecurring(); renderDashboard();
 }
 
+// Vérifie si une récurrente a démarré (tient compte de startMonthKey)
+function isRecurringStarted(r, monthKey) {
+  if(!r.startMonthKey) return true; // pas de contrainte
+  return monthKey >= r.startMonthKey;
+}
+
 function renderRecurring() {
   const el = document.getElementById('recurring-list');
   const todayDay = new Date().getDate();
@@ -1667,8 +1736,8 @@ function renderRecurring() {
   // SOLDE RÉCURRENT NET = actives filtrées dont le jour est > aujourd'hui (reste du mois)
   const now2 = new Date();
   const curMonthKey = `${now2.getFullYear()}-${String(now2.getMonth()+1).padStart(2,'0')}`;
-  const netCharges = list.filter(r=>r.type==='expense' && r.active!==false && r.day>todayDay && db.accounts.find(a=>a.id===r.accountId)?.includeInTotal!==false && !(r.pointed && r.pointed[curMonthKey])).reduce((s,r)=>s+r.amount,0);
-  const netIncomes = list.filter(r=>r.type==='income'  && r.active!==false && r.day>todayDay && db.accounts.find(a=>a.id===r.accountId)?.includeInTotal!==false && !(r.pointed && r.pointed[curMonthKey])).reduce((s,r)=>s+r.amount,0);
+  const netCharges = list.filter(r=>r.type==='expense' && r.active!==false && r.day>todayDay && db.accounts.find(a=>a.id===r.accountId)?.includeInTotal!==false && !(r.pointed && r.pointed[curMonthKey]) && isRecurringStarted(r, curMonthKey)).reduce((s,r)=>s+r.amount,0);
+  const netIncomes = list.filter(r=>r.type==='income'  && r.active!==false && r.day>todayDay && db.accounts.find(a=>a.id===r.accountId)?.includeInTotal!==false && !(r.pointed && r.pointed[curMonthKey]) && isRecurringStarted(r, curMonthKey)).reduce((s,r)=>s+r.amount,0);
   const netBalance = netIncomes - netCharges;
 
   // Trier : produits d'abord, puis charges, puis virements — puis par jour
@@ -1684,14 +1753,15 @@ function renderRecurring() {
     const cat      = CATEGORIES.find(c=>c.id===r.category)||CATEGORIES[8];
     const isTransfer = r.type === 'transfer';
     const isIncome   = r.type === 'income';
-    const passed   = r.day <= todayDay;
-    const isActive = r.active !== false;
+    const passed     = r.day <= todayDay;
+    const isActive   = r.active !== false;
+    const notStarted = !isRecurringStarted(r, curMonthKey);
 
     const subText = isTransfer
       ? `${acc?acc.icon+' '+acc.name:'?'} → ${toAcc?toAcc.icon+' '+toAcc.name:'?'}`
       : `${acc?acc.icon+' '+acc.name:'?'} · <span style="color:${cat.color}">${cat.icon} ${cat.label}</span>`;
 
-    const amtStyle = !isActive
+    const amtStyle = (!isActive || notStarted)
       ? 'color:var(--muted)'
       : isTransfer
         ? 'color:var(--accent)'
@@ -1703,11 +1773,17 @@ function renderRecurring() {
     const typeBadgeColor = isIncome ? 'rgba(16,185,129,.15)' : isTransfer ? 'rgba(59,130,246,.12)' : 'rgba(244,63,94,.12)';
     const typeBadgeText  = isIncome ? 'var(--green)' : isTransfer ? 'var(--accent)' : 'var(--red)';
 
+    const firstDate = r.startMonthKey
+      ? (() => { const [y,m] = r.startMonthKey.split('-'); return new Date(y,m-1,r.day).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}); })()
+      : null;
+
     const statusDot = !isActive
       ? `<span style="font-size:10px;color:var(--muted);font-weight:600">⏸ inactif</span>`
-      : passed
-        ? `<span style="font-size:10px;color:var(--green);font-weight:600">✓ passé${isIncome?'':'e'}</span>`
-        : `<span style="font-size:10px;color:var(--orange);font-weight:600">⏳ à venir</span>`;
+      : notStarted
+        ? `<span style="font-size:10px;color:var(--accent);font-weight:600">📅 démarre le ${firstDate}</span>`
+        : passed
+          ? `<span style="font-size:10px;color:var(--green);font-weight:600">✓ passé${isIncome?'':'e'}</span>`
+          : `<span style="font-size:10px;color:var(--orange);font-weight:600">⏳ à venir</span>`;
 
     // Toggle switch HTML
     const toggleSwitch = `
@@ -1727,14 +1803,15 @@ function renderRecurring() {
         </span>
       </label>`;
 
-    return `<div class="recurring-item" style="${!isActive?'opacity:.5':''}">
-      <div class="rec-day" style="background:${!isActive?'rgba(148,163,184,.1)':passed?'rgba(16,185,129,.1)':'rgba(245,158,11,.1)'};color:${!isActive?'var(--muted)':passed?'var(--green)':'var(--orange)'}">
+    return `<div class="recurring-item" style="${(!isActive||notStarted)?'opacity:.5':''}">
+      <div class="rec-day" style="background:${!isActive?'rgba(148,163,184,.1)':notStarted?'rgba(59,130,246,.08)':passed?'rgba(16,185,129,.1)':'rgba(245,158,11,.1)'};color:${!isActive?'var(--muted)':notStarted?'var(--accent)':passed?'var(--green)':'var(--orange)'}">
         <span>${r.day}</span><span>du mois</span>
       </div>
       <div class="rec-info">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
           <span style="font-size:13px;font-weight:600">${r.label}</span>
           <span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:5px;background:${typeBadgeColor};color:${typeBadgeText}">${typeLabel}</span>
+          ${r.loanId ? `<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:5px;background:rgba(59,130,246,.12);color:var(--accent)" title="Générée automatiquement par un prêt">🏦 Prêt</span>` : ''}
         </div>
         <div class="rec-sub">${subText}</div>
         <div style="margin-top:3px">${statusDot}</div>
@@ -1782,14 +1859,14 @@ function renderDashboard() {
 
   // Opérations récurrentes restantes ce mois (jour > aujourd'hui, actives uniquement)
   const dashMonthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  const pendingCharges = db.recurringCharges.filter(r=>r.active!==false && r.type==='expense' && r.day>todayDay && !(r.pointed && r.pointed[dashMonthKey]) && db.accounts.find(a=>a.id===r.accountId)?.includeInTotal!==false);
-  const pendingIncomes = db.recurringCharges.filter(r=>r.active!==false && r.type==='income'  && r.day>todayDay && !(r.pointed && r.pointed[dashMonthKey]) && db.accounts.find(a=>a.id===r.accountId)?.includeInTotal!==false);
+  const pendingCharges = db.recurringCharges.filter(r=>r.active!==false && r.type==='expense' && r.day>todayDay && !(r.pointed && r.pointed[dashMonthKey]) && db.accounts.find(a=>a.id===r.accountId)?.includeInTotal!==false && isRecurringStarted(r, dashMonthKey));
+  const pendingIncomes = db.recurringCharges.filter(r=>r.active!==false && r.type==='income'  && r.day>todayDay && !(r.pointed && r.pointed[dashMonthKey]) && db.accounts.find(a=>a.id===r.accountId)?.includeInTotal!==false && isRecurringStarted(r, dashMonthKey));
   const totalPendingOut = pendingCharges.reduce((s,r)=>s+r.amount,0);
   const totalPendingIn  = pendingIncomes.reduce((s,r)=>s+r.amount,0);
   const totalPending    = totalPendingOut - totalPendingIn; // net
 
   // Prochain événement récurrent à venir (charge ou produit, actif)
-  const pendingAll  = db.recurringCharges.filter(r=>r.active!==false && r.type!=='transfer' && r.day>todayDay && !(r.pointed && r.pointed[dashMonthKey]));
+  const pendingAll  = db.recurringCharges.filter(r=>r.active!==false && r.type!=='transfer' && r.day>todayDay && !(r.pointed && r.pointed[dashMonthKey]) && isRecurringStarted(r, dashMonthKey));
   const nextCharge  = [...pendingAll].sort((a,b)=>a.day-b.day)[0];
 
   document.getElementById('total-real').textContent  = fmt(totalReal);
@@ -1895,7 +1972,7 @@ function renderDashboard() {
 
   // 5 prochaines opérations à venir (récurrentes actives dont le jour > aujourd'hui)
   const upcoming = db.recurringCharges
-    .filter(r => r.active !== false && r.day > todayDay)
+    .filter(r => r.active !== false && r.day > todayDay && isRecurringStarted(r, monthKey))
     .sort((a,b) => a.day - b.day)
     .slice(0, 5);
 
@@ -2595,6 +2672,248 @@ function deleteCategory(id) {
     db.categories = db.categories.filter(c=>c.id!==id);
     save(); populateSelects(); renderSettings();
   });
+}
+
+// ════════════════════════════════════
+//  PRÊTS
+// ════════════════════════════════════
+function openLoanForm() {
+  const sel = document.getElementById('loan-account');
+  sel.innerHTML = db.accounts.map(a=>`<option value="${a.id}">${a.icon} ${a.name}</option>`).join('');
+  document.getElementById('loan-start').value = today();
+  document.getElementById('loan-first-payment').value = '';
+  document.getElementById('loan-form').style.display = 'block';
+  document.getElementById('loan-label').focus();
+}
+
+function closeLoanForm() {
+  document.getElementById('loan-form').style.display = 'none';
+  ['loan-label','loan-amount','loan-duration','loan-monthly','loan-insurance','loan-day','loan-first-payment'].forEach(id=>{
+    document.getElementById(id).value = '';
+  });
+}
+
+function saveLoan() {
+  const label        = document.getElementById('loan-label').value.trim();
+  const accountId    = document.getElementById('loan-account').value;
+  const start        = document.getElementById('loan-start').value;
+  const firstPayment = document.getElementById('loan-first-payment').value;
+  const day          = parseInt(document.getElementById('loan-day').value);
+  const amount       = parseFloat(document.getElementById('loan-amount').value);
+  const duration     = parseInt(document.getElementById('loan-duration').value);
+  const monthly      = parseFloat(document.getElementById('loan-monthly').value);
+  const insurance    = parseFloat(document.getElementById('loan-insurance').value) || 0;
+
+  if(!label)               { document.getElementById('loan-label').focus(); return; }
+  if(!accountId)           { document.getElementById('loan-account').focus(); return; }
+  if(!start)               { document.getElementById('loan-start').focus(); return; }
+  if(!firstPayment)        { document.getElementById('loan-first-payment').focus(); return; }
+  if(!day || isNaN(day))   { document.getElementById('loan-day').focus(); return; }
+  if(!amount||isNaN(amount))   { document.getElementById('loan-amount').focus(); return; }
+  if(!duration||isNaN(duration)) { document.getElementById('loan-duration').focus(); return; }
+  if(!monthly||isNaN(monthly))   { document.getElementById('loan-monthly').focus(); return; }
+
+  if(!db.loans) db.loans = [];
+
+  const id = 'loan_' + Date.now();
+  db.loans.push({ id, label, accountId, start, firstPayment, day, amount, duration, monthly, insurance });
+
+  // Calcul de la date de début effective de la récurrente
+  // Si firstPayment est dans le futur, on note le mois de démarrage
+  const totalMonthly = monthly + insurance;
+  const fp = firstPayment ? new Date(firstPayment) : new Date(start);
+  const fpMonthKey = `${fp.getFullYear()}-${String(fp.getMonth()+1).padStart(2,'0')}`;
+
+  // Une seule récurrente = mensualité + assurance
+  db.recurringCharges.push({
+    id: 'rec_' + id,
+    label: `${label}${insurance > 0 ? ` (dont ass. ${insurance.toFixed(2).replace('.',',')} €)` : ''}`,
+    amount: totalMonthly,
+    accountId, day, type: 'expense',
+    category: 'housing', active: true,
+    loanId: id,
+    startMonthKey: fpMonthKey,
+    applied: []
+  });
+
+  save();
+  closeLoanForm();
+  renderLoans();
+  renderRecurring();
+  renderDashboard();
+}
+
+function openEditLoan(id) {
+  const loan = (db.loans||[]).find(l=>l.id===id);
+  if(!loan) return;
+
+  const old = document.getElementById('edit-loan-modal');
+  if(old) old.remove();
+
+  const accOptions = db.accounts.map(a=>
+    `<option value="${a.id}" ${a.id===loan.accountId?'selected':''}>${a.icon} ${a.name}</option>`
+  ).join('');
+
+  const modal = document.createElement('div');
+  modal.id = 'edit-loan-modal';
+  modal.dataset.loanId = id;
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:flex-end';
+  modal.innerHTML = `
+    <div style="background:var(--bg2);border-radius:20px 20px 0 0;width:100%;padding:20px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px;max-height:90vh;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:15px;font-weight:700;color:var(--text)">Modifier le prêt</span>
+        <button onclick="document.getElementById('edit-loan-modal').remove()" style="background:var(--bg3);border:none;color:var(--muted);font-size:18px;padding:4px 10px;border-radius:8px;cursor:pointer">✕</button>
+      </div>
+      <div class="form-group" style="margin-bottom:0"><label>Libellé</label>
+        <input type="text" id="eloan-label" value="${loan.label}" maxlength="40"></div>
+      <div class="form-group" style="margin-bottom:0"><label>Compte prélevé</label>
+        <select id="eloan-account">${accOptions}</select></div>
+      <div style="display:flex;gap:8px">
+        <div class="form-group" style="margin-bottom:0;flex:1"><label>Date début</label>
+          <input type="date" id="eloan-start" value="${loan.start}"></div>
+        <div class="form-group" style="margin-bottom:0;flex:1"><label>1ère échéance</label>
+          <input type="date" id="eloan-first-payment" value="${loan.firstPayment||''}"></div>
+      </div>
+      <div class="form-group" style="margin-bottom:0"><label>Jour de prélèvement mensuel</label>
+        <input type="number" id="eloan-day" min="1" max="28" value="${loan.day}"></div>
+      <div style="display:flex;gap:8px">
+        <div class="form-group" style="margin-bottom:0;flex:1"><label>Montant emprunté (€)</label>
+          <input type="number" id="eloan-amount" step="0.01" value="${loan.amount}"></div>
+        <div class="form-group" style="margin-bottom:0;flex:1"><label>Durée (mois)</label>
+          <input type="number" id="eloan-duration" value="${loan.duration}"></div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <div class="form-group" style="margin-bottom:0;flex:1"><label>Mensualité (€)</label>
+          <input type="number" id="eloan-monthly" step="0.01" value="${loan.monthly}"></div>
+        <div class="form-group" style="margin-bottom:0;flex:1"><label>Assurance (€)</label>
+          <input type="number" id="eloan-insurance" step="0.01" value="${loan.insurance||0}"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button id="eloan-save-btn" class="btn btn-primary" style="flex:1">Enregistrer</button>
+        <button onclick="document.getElementById('edit-loan-modal').remove()" style="flex:0 0 auto;background:var(--bg3);border:none;color:var(--muted);padding:13px 16px;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer">Annuler</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  // Attacher le handler après insertion dans le DOM
+  document.getElementById('eloan-save-btn').onclick = () => saveEditLoan(id);
+}
+
+function saveEditLoan(id) {
+  const loan = (db.loans||[]).find(l=>l.id===id);
+  if(!loan) return;
+
+  const label        = document.getElementById('eloan-label').value.trim();
+  const accountId    = document.getElementById('eloan-account').value;
+  const start        = document.getElementById('eloan-start').value;
+  const firstPayment = document.getElementById('eloan-first-payment').value;
+  const day          = parseInt(document.getElementById('eloan-day').value);
+  const amount       = parseFloat(document.getElementById('eloan-amount').value);
+  const duration     = parseInt(document.getElementById('eloan-duration').value);
+  const monthly      = parseFloat(document.getElementById('eloan-monthly').value);
+  const insurance    = parseFloat(document.getElementById('eloan-insurance').value) || 0;
+
+  if(!label)               { document.getElementById('eloan-label').focus(); return; }
+  if(!accountId)           { document.getElementById('eloan-account').focus(); return; }
+  if(!start)               { document.getElementById('eloan-start').focus(); return; }
+  if(!day||isNaN(day))     { document.getElementById('eloan-day').focus(); return; }
+  if(!amount||isNaN(amount))     { document.getElementById('eloan-amount').focus(); return; }
+  if(!duration||isNaN(duration)) { document.getElementById('eloan-duration').focus(); return; }
+  if(!monthly||isNaN(monthly))   { document.getElementById('eloan-monthly').focus(); return; }
+
+  // Mettre à jour le prêt
+  Object.assign(loan, { label, accountId, start, firstPayment, day, amount, duration, monthly, insurance });
+
+  const totalMonthly = monthly + insurance;
+  const fp = firstPayment ? new Date(firstPayment) : new Date(start);
+  const fpMonthKey = `${fp.getFullYear()}-${String(fp.getMonth()+1).padStart(2,'0')}`;
+  const recLabel = `${label}${insurance > 0 ? ` (dont ass. ${insurance.toFixed(2).replace('.',',')} €)` : ''}`;
+
+  // Supprimer toutes les anciennes récurrentes du prêt et en créer une nouvelle unique
+  db.recurringCharges = db.recurringCharges.filter(r => r.loanId !== id);
+  db.recurringCharges.push({
+    id: 'rec_' + id,
+    label: recLabel,
+    amount: totalMonthly,
+    accountId, day, type: 'expense',
+    category: 'housing', active: true,
+    loanId: id,
+    startMonthKey: fpMonthKey,
+    applied: []
+  });
+
+  save();
+  document.getElementById('edit-loan-modal').remove();
+  renderLoans(); renderRecurring(); renderDashboard();
+}
+
+function deleteLoan(id) {
+  const loan = (db.loans||[]).find(l=>l.id===id);
+  if(!loan) return;
+  confirmDelete(`Supprimer le prêt "${loan.label}" ?`, 'Les récurrentes associées seront aussi supprimées.', () => {
+    db.loans = (db.loans||[]).filter(l=>l.id!==id);
+    db.recurringCharges = db.recurringCharges.filter(r=>r.loanId!==id);
+    save(); renderLoans(); renderRecurring(); renderDashboard();
+  });
+}
+
+function loanStats(loan) {
+  const now      = new Date();
+  // Référence : date de la 1ère échéance si disponible, sinon date début
+  const ref      = new Date(loan.firstPayment || loan.start);
+  const elapsed  = (now.getFullYear() - ref.getFullYear()) * 12 + (now.getMonth() - ref.getMonth());
+  const paid     = Math.max(0, Math.min(elapsed, loan.duration));
+  const remaining = loan.duration - paid;
+  const capitalPerMonth  = loan.amount / loan.duration;
+  const capitalRemaining = Math.max(0, loan.amount - capitalPerMonth * paid);
+  // Coût total = intérêts (mensualité seule × durée - capital) + assurance totale
+  const totalInterests = loan.monthly * loan.duration - loan.amount;
+  const totalInsurance = loan.insurance * loan.duration;
+  const totalCost      = totalInterests + totalInsurance;
+  // Date de fin basée sur 1ère échéance
+  const endDate  = new Date(ref);
+  endDate.setMonth(endDate.getMonth() + loan.duration - 1);
+  return { paid, remaining, capitalRemaining, totalCost, endDate };
+}
+
+function renderLoans() {
+  const el = document.getElementById('loans-list');
+  if(!el) return;
+  if(!db.loans || !db.loans.length) {
+    el.innerHTML = '<div class="empty-state"><span class="emoji">🏦</span><p>Aucun prêt enregistré</p></div>';
+    return;
+  }
+  el.innerHTML = db.loans.map(loan => {
+    const acc   = db.accounts.find(a=>a.id===loan.accountId);
+    const stats = loanStats(loan);
+    const pct   = Math.round((stats.paid / loan.duration) * 100);
+    const endStr = stats.endDate.toLocaleDateString('fr-FR', {month:'long', year:'numeric'});
+    // Taux approximatif
+    const rate  = loan.monthly > 0 ? (((loan.monthly - loan.insurance) * loan.duration - loan.amount) / loan.amount * 100 / (loan.duration/12)).toFixed(2) : '—';
+    return `<div class="card" style="margin-bottom:8px;padding:14px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:700;color:var(--text)">${loan.label}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${acc?acc.icon+' '+acc.name:'?'} · Prélevé le ${loan.day} · 1ère échéance ${loan.firstPayment ? new Date(loan.firstPayment).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}) : '—'}</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;margin-left:10px;flex-shrink:0">
+          <span style="font-size:16px;cursor:pointer" onclick="openEditLoan('${loan.id}')">✏️</span>
+          <span style="font-size:16px;cursor:pointer" onclick="deleteLoan('${loan.id}')">🗑</span>
+        </div>
+      </div>
+      <!-- Barre progression -->
+      <div style="background:var(--bg3);border-radius:6px;height:6px;margin-bottom:8px">
+        <div style="background:var(--accent2);border-radius:6px;height:6px;width:${pct}%;transition:width .3s"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px">
+        <div><span style="color:var(--muted)">Capital restant</span><br><strong style="color:var(--red)">${fmt(stats.capitalRemaining)}</strong></div>
+        <div><span style="color:var(--muted)">Mensualités restantes</span><br><strong style="color:var(--text)">${stats.remaining} / ${loan.duration}</strong></div>
+        <div><span style="color:var(--muted)">Mensualité + assurance</span><br><strong style="color:var(--text)">${fmt(loan.monthly)} + ${fmt(loan.insurance)} = ${fmt(loan.monthly + loan.insurance)}</strong></div>
+        <div><span style="color:var(--muted)">Fin estimée</span><br><strong style="color:var(--text)">${endStr}</strong></div>
+        <div><span style="color:var(--muted)">Coût total crédit</span><br><strong style="color:var(--orange)">${fmt(stats.totalCost)}</strong></div>
+        <div><span style="color:var(--muted)">Taux annuel approx.</span><br><strong style="color:var(--text)">${rate} %</strong></div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ════════════════════════════════════
