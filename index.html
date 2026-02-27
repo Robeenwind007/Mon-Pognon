@@ -421,7 +421,7 @@
 <div class="topbar">
   <h1>Mon<span>Pognon</span></h1>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px">
-    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.5.2</div>
+    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.5.4</div>
     <div id="sync-status" style="font-size:10px;color:var(--muted)">…</div>
   </div>
 </div>
@@ -744,7 +744,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '1.5.2';
+const APP_VERSION = '1.5.4';
 
 const DEFAULT_CATEGORIES = [
   { id:'salary',    label:'Salaire',      icon:'💼', color:'#10b981', system:true },
@@ -2564,30 +2564,28 @@ async function syncPush() {
 async function syncPull() {
   try {
     setSyncStatus('↓ chargement…', 'var(--muted)');
+    console.log('[MonPognon] syncPull — appel Supabase...');
     const res = await fetch(
       `${SB_URL}/rest/v1/sync_data?user_key=eq.${SB_USER_KEY}&select=data,updated_at`,
       { headers: sbHeaders() }
     );
+    console.log('[MonPognon] syncPull — status HTTP:', res.status);
     if(!res.ok) { setSyncStatus('⚠ erreur sync', 'var(--orange)'); return false; }
     const rows = await res.json();
+    console.log('[MonPognon] syncPull — rows reçus:', rows.length, rows[0]?.updated_at);
     if(rows.length && rows[0].data) {
-      const remote     = rows[0].data;
-      const remoteTime = new Date(rows[0].updated_at).getTime();
-      const localMeta  = localStorage.getItem(STORAGE_KEY + '_updated');
-      const localTime  = localMeta ? parseInt(localMeta) : 0;
-      // Le plus récent gagne — point
-      if(remoteTime > localTime) {
-        db = remote;
-        if(!db.categories) db.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-        localStorage.setItem(STORAGE_KEY + '_updated', remoteTime);
-        setSyncStatus('✓ synchronisé', 'var(--green)');
-        return true;
-      }
+      db = rows[0].data;
+      if(!db.categories) db.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+      localStorage.setItem(STORAGE_KEY + '_updated', new Date(rows[0].updated_at).getTime());
+      console.log('[MonPognon] syncPull — db chargée, transactions:', db.transactions?.length);
+      setSyncStatus('✓ synchronisé', 'var(--green)');
+      return true;
     }
-    setSyncStatus('✓ local à jour', 'var(--green)');
+    setSyncStatus('✓ prêt', 'var(--green)');
     return false;
   } catch(e) {
+    console.error('[MonPognon] syncPull erreur:', e);
     setSyncStatus('⚠ hors ligne', 'var(--orange)');
     return false;
   }
