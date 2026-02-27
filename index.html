@@ -28,6 +28,40 @@
     --safe: env(safe-area-inset-bottom);
   }
 
+  /* ─── THÈME CLAIR ─── */
+  :root.theme-light {
+    --bg: #f0f4f8;
+    --bg2: #ffffff;
+    --bg3: #e4eaf2;
+    --card: #ffffff;
+    --border: #d1dce8;
+    --accent: #2563eb;
+    --accent2: #0891b2;
+    --green: #059669;
+    --red: #e11d48;
+    --orange: #d97706;
+    --text: #0f172a;
+    --muted: #64748b;
+  }
+
+  /* ─── THÈME SYSTÈME ─── */
+  @media (prefers-color-scheme: light) {
+    :root.theme-system {
+      --bg: #f0f4f8;
+      --bg2: #ffffff;
+      --bg3: #e4eaf2;
+      --card: #ffffff;
+      --border: #d1dce8;
+      --accent: #2563eb;
+      --accent2: #0891b2;
+      --green: #059669;
+      --red: #e11d48;
+      --orange: #d97706;
+      --text: #0f172a;
+      --muted: #64748b;
+    }
+  }
+
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 
   body {
@@ -42,7 +76,7 @@
   /* ─── TOP BAR ─── */
   .topbar {
     position:fixed; top:0; left:0; right:0; z-index:100;
-    background:rgba(10,15,30,.85);
+    background:rgba(var(--bg-rgb, 10,15,30),.92);
     backdrop-filter:blur(20px);
     -webkit-backdrop-filter:blur(20px);
     padding:calc(env(safe-area-inset-top) + 12px) 20px 14px;
@@ -421,7 +455,7 @@
 <div class="topbar">
   <h1>Mon<span>Pognon</span></h1>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px">
-    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.5.4</div>
+    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.5.7</div>
     <div id="sync-status" style="font-size:10px;color:var(--muted)">…</div>
   </div>
 </div>
@@ -574,6 +608,22 @@
 
     <div style="height:16px"></div>
 
+    <!-- ── APPARENCE ── -->
+    <div class="section-title">Apparence</div>
+    <div class="card" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px">
+      <div>
+        <div style="font-size:14px;font-weight:600;color:var(--text)">Thème</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">Sombre, clair ou selon le système</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button id="theme-btn-dark"   onclick="setTheme('dark')"   style="padding:7px 12px;border-radius:10px;border:1.5px solid var(--border);font-size:12px;font-weight:600;cursor:pointer;background:var(--bg3);color:var(--text)">🌙 Sombre</button>
+        <button id="theme-btn-light"  onclick="setTheme('light')"  style="padding:7px 12px;border-radius:10px;border:1.5px solid var(--border);font-size:12px;font-weight:600;cursor:pointer;background:var(--bg3);color:var(--text)">☀️ Clair</button>
+        <button id="theme-btn-system" onclick="setTheme('system')" style="padding:7px 12px;border-radius:10px;border:1.5px solid var(--border);font-size:12px;font-weight:600;cursor:pointer;background:var(--bg3);color:var(--text)">⚙️ Système</button>
+      </div>
+    </div>
+
+    <div style="height:16px"></div>
+
     <div class="section-title">Catégories</div>
     <div class="card" id="settings-categories-list"></div>
 
@@ -660,6 +710,18 @@
   </div>
 </nav>
 
+<!-- ══ MODAL: CONFIRMATION ══ -->
+<div id="confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:flex-end">
+  <div style="background:var(--bg2);border-radius:20px 20px 0 0;width:100%;padding:24px 20px;box-sizing:border-box">
+    <div id="confirm-modal-text" style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px"></div>
+    <div id="confirm-modal-sub" style="font-size:13px;color:var(--muted);margin-bottom:20px"></div>
+    <div style="display:flex;gap:10px">
+      <button id="confirm-modal-cancel" style="flex:1;padding:13px;border-radius:12px;border:none;background:var(--bg3);color:var(--muted);font-size:15px;font-weight:600;cursor:pointer">Annuler</button>
+      <button id="confirm-modal-ok" style="flex:1;padding:13px;border-radius:12px;border:none;background:var(--red);color:#fff;font-size:15px;font-weight:600;cursor:pointer">Supprimer</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ SHEET: AJOUTER OPÉRATION ══ -->
 <div class="sheet-overlay" id="overlay-add-sheet" onclick="closeSheet('add-sheet')"></div>
 <div class="sheet" id="add-sheet">
@@ -744,7 +806,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '1.5.4';
+const APP_VERSION = '1.5.7';
 
 const DEFAULT_CATEGORIES = [
   { id:'salary',    label:'Salaire',      icon:'💼', color:'#10b981', system:true },
@@ -792,6 +854,8 @@ let periodOffset = 0;
 //  INIT
 // ════════════════════════════════════
 function init() {
+  // Appliquer le thème sauvegardé
+  applyTheme(localStorage.getItem('mp_theme') || 'dark');
   // Migration : si db sans categories, on injecte les défauts
   if(!db.categories) { db.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)); save(); }
   fillDateFields();
@@ -843,7 +907,7 @@ function showPage(name, el) {
   if(el) el.classList.add('active');
   if(name==='stats') renderStats();
   if(name==='saisie') { renderOperations(); }
-  if(name==='settings') { renderSettings(); renderAccountsManage(); renderRecurring(); }
+  if(name==='settings') { renderSettings(); renderAccountsManage(); renderRecurring(); applyTheme(localStorage.getItem('mp_theme') || 'dark'); }
 }
 
 // ════════════════════════════════════
@@ -938,11 +1002,14 @@ function addAccount() {
 }
 
 function deleteAccount(id) {
-  if(!confirm('Supprimer ce compte ?')) return;
-  db.accounts = db.accounts.filter(a=>a.id!==id);
-  db.transactions = db.transactions.filter(t=>t.accountId!==id);
-  db.recurringCharges = db.recurringCharges.filter(r=>r.accountId!==id);
-  save(); populateSelects(); renderDashboard(); renderAccountsManage(); renderRecurring();
+  const a = db.accounts.find(a=>a.id===id);
+  if(!a) return;
+  confirmDelete('Supprimer ce compte ?', `"${a.name}" et toutes ses opérations seront supprimés.`, () => {
+    db.accounts = db.accounts.filter(a=>a.id!==id);
+    db.transactions = db.transactions.filter(t=>t.accountId!==id);
+    db.recurringCharges = db.recurringCharges.filter(r=>r.accountId!==id);
+    save(); populateSelects(); renderDashboard(); renderAccountsManage(); renderRecurring();
+  });
 }
 
 function accountBalance(accId) {
@@ -1398,13 +1465,18 @@ function pushTransfer({label, amount, fromAccountId, toAccountId, date}) {
 
 function deleteTransaction(id) {
   const tx = db.transactions.find(t=>t.id===id);
-  if(tx && tx.isTransfer && tx.transferId) {
-    if(!confirm('Supprimer le virement complet (les deux mouvements) ?')) return;
-    db.transactions = db.transactions.filter(t=>t.transferId!==tx.transferId);
+  if(!tx) return;
+  if(tx.isTransfer && tx.transferId) {
+    confirmDelete('Supprimer ce virement ?', 'Les deux mouvements (débit et crédit) seront supprimés.', () => {
+      db.transactions = db.transactions.filter(t=>t.transferId!==tx.transferId);
+      save(); renderDashboard(); renderStats(); renderOperations();
+    });
   } else {
-    db.transactions = db.transactions.filter(t=>t.id!==id);
+    confirmDelete('Supprimer cette opération ?', `"${tx.label}" — ${tx.amount} €`, () => {
+      db.transactions = db.transactions.filter(t=>t.id!==id);
+      save(); renderDashboard(); renderStats(); renderOperations();
+    });
   }
-  save(); renderDashboard(); renderStats(); renderOperations();
 }
 
 // ════════════════════════════════════
@@ -1437,9 +1509,12 @@ function addRecurring() {
 }
 
 function deleteRecurring(id) {
-  if(!confirm('Supprimer cette opération récurrente ?')) return;
-  db.recurringCharges = db.recurringCharges.filter(r=>r.id!==id);
-  save(); renderRecurring(); renderDashboard();
+  const r = db.recurringCharges.find(r=>r.id===id);
+  if(!r) return;
+  confirmDelete('Supprimer cette récurrente ?', `"${r.label}" — ${r.amount} €`, () => {
+    db.recurringCharges = db.recurringCharges.filter(r=>r.id!==id);
+    save(); renderRecurring(); renderDashboard();
+  });
 }
 
 function toggleRecurring(id) {
@@ -2511,11 +2586,32 @@ function deleteCategory(id) {
   const uses = db.transactions.filter(t=>t.category===id).length
              + db.recurringCharges.filter(r=>r.category===id).length;
   if(uses > 0) { alert(`Cette catégorie est utilisée dans ${uses} opération(s).`); return; }
-  if(!confirm(`Supprimer la catégorie "${cat.label}" ?`)) return;
-  db.categories = db.categories.filter(c=>c.id!==id);
-  save();
-  populateSelects();
-  renderSettings();
+  confirmDelete(`Supprimer la catégorie "${cat.label}" ?`, 'Cette action est irréversible.', () => {
+    db.categories = db.categories.filter(c=>c.id!==id);
+    save(); populateSelects(); renderSettings();
+  });
+}
+
+// ════════════════════════════════════
+//  THÈME
+// ════════════════════════════════════
+function applyTheme(theme) {
+  const root = document.documentElement;
+  root.classList.remove('theme-light', 'theme-system');
+  if(theme === 'light')  root.classList.add('theme-light');
+  if(theme === 'system') root.classList.add('theme-system');
+  // Mettre à jour l'apparence des boutons
+  ['dark','light','system'].forEach(t => {
+    const btn = document.getElementById(`theme-btn-${t}`);
+    if(!btn) return;
+    btn.style.borderColor = theme === t ? 'var(--accent2)' : 'var(--border)';
+    btn.style.color       = theme === t ? 'var(--accent2)' : 'var(--text)';
+  });
+}
+
+function setTheme(theme) {
+  localStorage.setItem('mp_theme', theme);
+  applyTheme(theme);
 }
 
 // ════════════════════════════════════
@@ -2540,6 +2636,18 @@ function setSyncStatus(msg, color) {
   if(!el) return;
   el.textContent = msg;
   el.style.color = color || 'var(--muted)';
+}
+
+function confirmDelete(text, sub, onConfirm) {
+  const modal  = document.getElementById('confirm-modal');
+  document.getElementById('confirm-modal-text').textContent = text;
+  document.getElementById('confirm-modal-sub').textContent  = sub || '';
+  modal.style.display = 'flex';
+  const btnOk     = document.getElementById('confirm-modal-ok');
+  const btnCancel = document.getElementById('confirm-modal-cancel');
+  const close = () => { modal.style.display = 'none'; btnOk.onclick = null; btnCancel.onclick = null; };
+  btnOk.onclick     = () => { close(); onConfirm(); };
+  btnCancel.onclick = () => close();
 }
 
 async function syncPush() {
@@ -2605,16 +2713,18 @@ function save() {
 //  START
 // ════════════════════════════════════
 async function start() {
-  // Tenter de récupérer les données distantes avant d'afficher
   const pulled = await syncPull();
   if(pulled) {
-    // Réinitialiser avec les données distantes
+    // Rafraîchir toutes les vues avec les données distantes
+    populateSelects();
+    applyRecurringIfNeeded();
     renderDashboard();
     renderAccountsManage();
     renderRecurring();
     renderStats();
     renderSettings();
     renderOperations();
+    console.log('[MonPognon] start() — interface rafraîchie après pull');
   }
 }
 
