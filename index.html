@@ -420,7 +420,7 @@
 <!-- TOP BAR -->
 <div class="topbar">
   <h1>Mon<span>Pognon</span></h1>
-  <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.4.9</div>
+  <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.5.0</div>
 </div>
 
 <!-- MAIN -->
@@ -741,7 +741,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '1.4.9';
+const APP_VERSION = '1.5.0';
 
 const DEFAULT_CATEGORIES = [
   { id:'salary',    label:'Salaire',      icon:'💼', color:'#10b981', system:true },
@@ -1706,7 +1706,7 @@ function renderDashboard() {
   const totalPending    = totalPendingOut - totalPendingIn; // net
 
   // Prochain événement récurrent à venir (charge ou produit, actif)
-  const pendingAll  = db.recurringCharges.filter(r=>r.active!==false && r.type!=='transfer' && r.day>todayDay);
+  const pendingAll  = db.recurringCharges.filter(r=>r.active!==false && r.type!=='transfer' && r.day>todayDay && !(r.pointed && r.pointed[dashMonthKey]));
   const nextCharge  = [...pendingAll].sort((a,b)=>a.day-b.day)[0];
 
   document.getElementById('total-real').textContent  = fmt(totalReal);
