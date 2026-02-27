@@ -456,7 +456,7 @@
 <div class="topbar">
   <h1>Mon<span>Pognon</span></h1>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px">
-    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.5.8</div>
+    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.5.9</div>
     <div style="display:flex;align-items:center;gap:6px">
       <div id="sync-status" style="font-size:10px;color:var(--muted)">…</div>
       <span onclick="forceSync()" title="Forcer la synchronisation"
@@ -587,8 +587,24 @@
   <!-- ══ PAGE: PARAMÈTRES ══ -->
   <div class="page" id="page-settings">
 
+    <!-- ── APPARENCE ── -->
+    <div class="section-title" style="margin-top:0">Apparence</div>
+    <div class="card" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px">
+      <div>
+        <div style="font-size:14px;font-weight:600;color:var(--text)">Thème</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">Sombre, clair ou selon le système</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button id="theme-btn-dark"   onclick="setTheme('dark')"   style="padding:7px 12px;border-radius:10px;border:1.5px solid var(--border);font-size:12px;font-weight:600;cursor:pointer;background:var(--bg3);color:var(--text)">🌙 Sombre</button>
+        <button id="theme-btn-light"  onclick="setTheme('light')"  style="padding:7px 12px;border-radius:10px;border:1.5px solid var(--border);font-size:12px;font-weight:600;cursor:pointer;background:var(--bg3);color:var(--text)">☀️ Clair</button>
+        <button id="theme-btn-system" onclick="setTheme('system')" style="padding:7px 12px;border-radius:10px;border:1.5px solid var(--border);font-size:12px;font-weight:600;cursor:pointer;background:var(--bg3);color:var(--text)">⚙️ Système</button>
+      </div>
+    </div>
+
+    <div style="height:16px"></div>
+
     <!-- ── COMPTES ── -->
-    <div class="section-title" style="margin-top:0">Comptes</div>
+    <div class="section-title">Comptes</div>
     <div class="card" id="accounts-list-manage"></div>
     <button class="btn btn-primary" onclick="openSheet('account-sheet')" style="margin-top:8px;width:100%">+ Créer un compte</button>
 
@@ -610,22 +626,6 @@
       <div class="empty-state"><span class="emoji">🔄</span><p>Aucune opération récurrente</p></div>
     </div>
     <button class="btn btn-primary" onclick="openSheet('recurring-sheet')" style="margin-top:8px;width:100%">+ Ajouter une opération récurrente</button>
-
-    <div style="height:16px"></div>
-
-    <!-- ── APPARENCE ── -->
-    <div class="section-title">Apparence</div>
-    <div class="card" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px">
-      <div>
-        <div style="font-size:14px;font-weight:600;color:var(--text)">Thème</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px">Sombre, clair ou selon le système</div>
-      </div>
-      <div style="display:flex;gap:6px">
-        <button id="theme-btn-dark"   onclick="setTheme('dark')"   style="padding:7px 12px;border-radius:10px;border:1.5px solid var(--border);font-size:12px;font-weight:600;cursor:pointer;background:var(--bg3);color:var(--text)">🌙 Sombre</button>
-        <button id="theme-btn-light"  onclick="setTheme('light')"  style="padding:7px 12px;border-radius:10px;border:1.5px solid var(--border);font-size:12px;font-weight:600;cursor:pointer;background:var(--bg3);color:var(--text)">☀️ Clair</button>
-        <button id="theme-btn-system" onclick="setTheme('system')" style="padding:7px 12px;border-radius:10px;border:1.5px solid var(--border);font-size:12px;font-weight:600;cursor:pointer;background:var(--bg3);color:var(--text)">⚙️ Système</button>
-      </div>
-    </div>
 
     <div style="height:16px"></div>
 
@@ -811,7 +811,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '1.5.8';
+const APP_VERSION = '1.5.9';
 
 const DEFAULT_CATEGORIES = [
   { id:'salary',    label:'Salaire',      icon:'💼', color:'#10b981', system:true },
