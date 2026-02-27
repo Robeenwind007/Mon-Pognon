@@ -456,7 +456,7 @@
 <div class="topbar">
   <h1>Auto<span>Thunes</span></h1>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px">
-    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.8.5</div>
+    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.8.6</div>
     <div style="display:flex;align-items:center;gap:6px">
       <div id="sync-status" style="font-size:10px;color:var(--muted)">…</div>
       <span onclick="forceSync()" title="Forcer la synchronisation"
@@ -877,7 +877,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '1.8.5';
+const APP_VERSION = '1.8.6';
 
 const DEFAULT_CATEGORIES = [
   { id:'salary',    label:'Salaire',      icon:'💼', color:'#10b981', system:true },
@@ -899,7 +899,7 @@ function load() {
     return JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaultDb();
   } catch(e) { return defaultDb(); }
 }
-function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); }
+function saveLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); }
 
 // ════════════════════════════════════
 //  STATE
@@ -925,10 +925,8 @@ let periodOffset = 0;
 //  INIT
 // ════════════════════════════════════
 function init() {
-  // Appliquer le thème sauvegardé
   applyTheme(localStorage.getItem('mp_theme') || 'dark');
-  // Migration : si db sans categories, on injecte les défauts
-  if(!db.categories) { db.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)); save(); }
+  if(!db.categories) { db.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)); saveLocal(); }
   if(!db.loans) { db.loans = []; }
   fillDateFields();
   populateSelects();
@@ -938,7 +936,6 @@ function init() {
   renderRecurring();
   renderStats();
   renderSettings();
-  // Show onboarding if no accounts yet
   if(db.accounts.length === 0) {
     document.getElementById('onboarding').classList.add('visible');
   }
@@ -3124,13 +3121,17 @@ function setTheme(theme) {
 async function forceSync() {
   const btn = document.getElementById('sync-btn');
   if(btn) btn.style.animation = 'spin .7s linear infinite';
-  await syncPush();
+  // Pull d'abord pour récupérer les données distantes
   const pulled = await syncPull();
   if(pulled) {
-    populateSelects(); applyRecurringIfNeeded();
+    populateSelects();
+    applyRecurringIfNeeded();
     renderDashboard(); renderAccountsManage();
-    renderRecurring(); renderStats();
-    renderSettings(); renderOperations();
+    renderRecurring(); renderLoans();
+    renderStats(); renderSettings(); renderOperations();
+  } else {
+    // Rien de plus récent en remote → on push nos données locales
+    await syncPush();
   }
   if(btn) btn.style.animation = '';
 }
@@ -3138,12 +3139,12 @@ async function forceSync() {
 // ════════════════════════════════════
 //  SUPABASE SYNC
 // ════════════════════════════════════
-const SB_URL = 'https://nqhcphhxdwqksgxcrafh.supabase.co';
-const SB_KEY = 'sb_publishable_fvlEQ8tNlXSj7J15gqf-fQ_MK0900fm';
+const SB_URL     = 'https://nqhcphhxdwqksgxcrafh.supabase.co';
+const SB_KEY     = 'sb_publishable_fvlEQ8tNlXSj7J15gqf-fQ_MK0900fm';
 const SB_USER_KEY = 'monpognon_user';
 
-let syncTimeout = null;
-let syncPulling = false; // bloque le push pendant un pull
+let syncTimeout  = null;
+let syncBusy     = false; // verrou global : interdit push et pull simultanés
 
 function sbHeaders() {
   return {
@@ -3160,20 +3161,16 @@ function setSyncStatus(msg, color) {
   el.style.color = color || 'var(--muted)';
 }
 
-function confirmDelete(text, sub, onConfirm) {
-  const modal  = document.getElementById('confirm-modal');
-  document.getElementById('confirm-modal-text').textContent = text;
-  document.getElementById('confirm-modal-sub').textContent  = sub || '';
-  modal.style.display = 'flex';
-  const btnOk     = document.getElementById('confirm-modal-ok');
-  const btnCancel = document.getElementById('confirm-modal-cancel');
-  const close = () => { modal.style.display = 'none'; btnOk.onclick = null; btnCancel.onclick = null; };
-  btnOk.onclick     = () => { close(); setTimeout(() => { onConfirm(); requestAnimationFrame(() => refreshAll()); }, 50); };
-  btnCancel.onclick = () => close();
+// save() : sauvegarde locale + push Supabase différé
+function save() {
+  saveLocal();
+  clearTimeout(syncTimeout);
+  syncTimeout = setTimeout(syncPush, 1500);
 }
 
 async function syncPush() {
-  if(syncPulling) return; // ne pas écraser pendant un pull
+  if(syncBusy) { syncTimeout = setTimeout(syncPush, 1000); return; }
+  syncBusy = true;
   try {
     setSyncStatus('↑ sync…', 'var(--muted)');
     const res = await fetch(`${SB_URL}/rest/v1/sync_data`, {
@@ -3185,53 +3182,43 @@ async function syncPush() {
         updated_at: new Date().toISOString()
       })
     });
-    if(res.ok) setSyncStatus('✓ synchronisé', 'var(--green)');
-    else setSyncStatus('⚠ erreur sync', 'var(--orange)');
+    setSyncStatus(res.ok ? '✓ synchronisé' : '⚠ erreur sync', res.ok ? 'var(--green)' : 'var(--orange)');
   } catch(e) {
     setSyncStatus('⚠ hors ligne', 'var(--orange)');
+  } finally {
+    syncBusy = false;
   }
 }
 
 async function syncPull() {
+  if(syncBusy) return false;
+  syncBusy = true;
   try {
-    syncPulling = true;
     setSyncStatus('↓ chargement…', 'var(--muted)');
     const res = await fetch(
       `${SB_URL}/rest/v1/sync_data?user_key=eq.${SB_USER_KEY}&select=data,updated_at`,
       { headers: sbHeaders() }
     );
-    if(!res.ok) { setSyncStatus('⚠ erreur sync', 'var(--orange)'); syncPulling = false; return false; }
+    if(!res.ok) { setSyncStatus('⚠ erreur sync', 'var(--orange)'); return false; }
     const rows = await res.json();
     if(rows.length && rows[0].data) {
       db = rows[0].data;
-      if(!db.categories) db.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
-      if(!db.loans) db.loans = [];
+      if(!db.categories)       db.categories       = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+      if(!db.loans)            db.loans            = [];
       if(!db.recurringCharges) db.recurringCharges = [];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-      localStorage.setItem(STORAGE_KEY + '_updated', new Date(rows[0].updated_at).getTime());
+      if(!db.transactions)     db.transactions     = [];
+      if(!db.accounts)         db.accounts         = [];
+      saveLocal(); // persiste localement SANS déclencher un push
       setSyncStatus('✓ synchronisé', 'var(--green)');
-      syncPulling = false;
       return true;
     }
     setSyncStatus('✓ prêt', 'var(--green)');
-    syncPulling = false;
     return false;
   } catch(e) {
     setSyncStatus('⚠ hors ligne', 'var(--orange)');
-    syncPulling = false;
     return false;
-  }
-}
-
-// Surcharge de save() pour pousser vers Supabase avec debounce
-const _saveLocal = save;
-function save() {
-  const now = Date.now();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-  localStorage.setItem(STORAGE_KEY + '_updated', now);
-  if(!syncPulling) {
-    clearTimeout(syncTimeout);
-    syncTimeout = setTimeout(syncPush, 1500);
+  } finally {
+    syncBusy = false;
   }
 }
 
@@ -3242,6 +3229,7 @@ async function start() {
   const pulled = await syncPull();
   if(pulled) {
     populateSelects();
+    applyRecurringIfNeeded();
     renderDashboard();
     renderAccountsManage();
     renderRecurring();
