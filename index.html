@@ -456,7 +456,7 @@
 <div class="topbar">
   <h1>Auto<span>Thunes</span></h1>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px">
-    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.7.4</div>
+    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.8.2</div>
     <div style="display:flex;align-items:center;gap:6px">
       <div id="sync-status" style="font-size:10px;color:var(--muted)">…</div>
       <span onclick="forceSync()" title="Forcer la synchronisation"
@@ -469,7 +469,7 @@
 <div class="main">
 
   <!-- ══ PAGE: TABLEAU DE BORD ══ -->
-  <div class="page active" id="page-dashboard">
+  <div class="page active" id="page-dashboard"><div style="display:flex;justify-content:flex-end;margin-bottom:4px"><button onclick="renderDashboard()" style="background:var(--bg3);border:none;color:var(--muted);font-size:12px;padding:5px 10px;border-radius:10px;cursor:pointer">↺ Actualiser</button></div>
     <div class="balance-grid">
       <div class="card" style="grid-column:1/-1">
         <div class="card-label">Solde à date</div>
@@ -514,6 +514,7 @@
     <!-- Opérations saisies — non récurrentes -->
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
       <div class="section-title" style="margin:0;flex:1">Opérations</div>
+      <button onclick="renderOperations()" style="background:var(--bg3);border:none;color:var(--muted);font-size:12px;padding:5px 10px;border-radius:10px;cursor:pointer">↺</button>
       <select id="ops-filter-account" onchange="renderOperations()"
         style="font-size:12px;padding:5px 8px;border-radius:10px;background:var(--bg3);border:1px solid var(--border);color:var(--text);max-width:130px">
         <option value="">Tous les comptes</option>
@@ -530,7 +531,7 @@
   </div>
 
   <!-- ══ PAGE: STATS ══ -->
-  <div class="page" id="page-stats">
+  <div class="page" id="page-stats"><div style="display:flex;justify-content:flex-end;margin-bottom:4px"><button onclick="renderStats()" style="background:var(--bg3);border:none;color:var(--muted);font-size:12px;padding:5px 10px;border-radius:10px;cursor:pointer">↺ Actualiser</button></div>
     <div class="period-tabs">
       <div class="period-tab active" onclick="setPeriod('month',this)">Mois</div>
       <div class="period-tab" onclick="setPeriod('quarter',this)">Trimestre</div>
@@ -585,7 +586,7 @@
   </div>
 
   <!-- ══ PAGE: PARAMÈTRES ══ -->
-  <div class="page" id="page-settings">
+  <div class="page" id="page-settings"><div style="display:flex;justify-content:flex-end;margin-bottom:4px"><button onclick="renderSettings();renderAccountsManage();renderRecurring();renderLoans()" style="background:var(--bg3);border:none;color:var(--muted);font-size:12px;padding:5px 10px;border-radius:10px;cursor:pointer">↺ Actualiser</button></div>
 
     <!-- ── APPARENCE ── -->
     <div class="section-title" style="margin-top:0">Apparence</div>
@@ -789,8 +790,10 @@
 <!-- ══ SHEET: AJOUTER OPÉRATION ══ -->
 <div class="sheet-overlay" id="overlay-add-sheet" onclick="closeSheet('add-sheet')"></div>
 <div class="sheet" id="add-sheet">
-  <div class="sheet-handle"></div>
-  <div class="sheet-title">Nouvelle opération rapide</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+    <div style="font-size:18px;font-weight:700">Nouvelle opération rapide</div>
+    <button onclick="event.stopPropagation();closeSheet('add-sheet')" style="background:var(--bg3);border:none;color:var(--muted);font-size:20px;width:34px;height:34px;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+  </div>
   <div class="type-toggle" style="grid-template-columns:1fr 1fr 1fr">
     <div class="type-btn active income" id="sheet-btn-income" onclick="setSheetType('income')">+ Recette</div>
     <div class="type-btn expense" id="sheet-btn-expense" onclick="setSheetType('expense')">− Dépense</div>
@@ -810,14 +813,16 @@
   <div class="form-group" id="s-account-to-group" style="display:none"><label>Compte destinataire</label><select id="s-account-to"></select></div>
   <div class="form-group" id="s-category-group"><label>Catégorie</label><select id="s-category"></select></div>
   <div class="form-group"><label>Date</label><input type="date" id="s-date"></div>
-  <button class="btn btn-primary" onclick="addTransactionSheet()">Enregistrer</button>
+  <button class="btn btn-primary" onclick="event.stopPropagation();addTransactionSheet()">Enregistrer</button>
 </div>
 
 <!-- ══ SHEET: AJOUTER COMPTE ══ -->
 <div class="sheet-overlay" id="overlay-account-sheet" onclick="closeSheet('account-sheet')"></div>
 <div class="sheet" id="account-sheet">
-  <div class="sheet-handle"></div>
-  <div class="sheet-title">Nouveau compte</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+    <div style="font-size:18px;font-weight:700">Nouveau compte</div>
+    <button onclick="event.stopPropagation();closeSheet('account-sheet')" style="background:var(--bg3);border:none;color:var(--muted);font-size:20px;width:34px;height:34px;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+  </div>
   <div class="form-group"><label>Nom du compte</label><input type="text" id="acc-name" placeholder="Ex: LCL Courant, Livret A…"></div>
   <div class="form-group"><label>Type de compte</label><select id="acc-type" onchange="syncIconToType()">
     <option value="courant">🏦 Courant</option>
@@ -846,8 +851,10 @@
 <!-- ══ SHEET: CHARGE RÉCURRENTE ══ -->
 <div class="sheet-overlay" id="overlay-recurring-sheet" onclick="closeSheet('recurring-sheet')"></div>
 <div class="sheet" id="recurring-sheet">
-  <div class="sheet-handle"></div>
-  <div class="sheet-title">Opération récurrente</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+    <div style="font-size:18px;font-weight:700">Opération récurrente</div>
+    <button onclick="event.stopPropagation();closeSheet('recurring-sheet')" style="background:var(--bg3);border:none;color:var(--muted);font-size:20px;width:34px;height:34px;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+  </div>
   <div class="type-toggle" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:14px">
     <div class="type-btn active expense" id="rec-btn-expense" onclick="setRecType('expense')">− Charge</div>
     <div class="type-btn income" id="rec-btn-income" onclick="setRecType('income')">+ Produit</div>
@@ -870,7 +877,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '1.7.4';
+const APP_VERSION = '1.8.2';
 
 const DEFAULT_CATEGORIES = [
   { id:'salary',    label:'Salaire',      icon:'💼', color:'#10b981', system:true },
@@ -981,12 +988,33 @@ function showPage(name, el) {
 function openSheet(name) {
   populateSelects();
   fillDateFields();
-  document.getElementById(name).classList.add('open');
-  document.getElementById('overlay-'+name).classList.add('open');
+  const sheet   = document.getElementById(name);
+  const overlay = document.getElementById('overlay-'+name);
+  if(!sheet || !overlay) return;
+  overlay.classList.add('open');
+  // Force reflow avant d'ajouter open pour que la transition joue
+  sheet.getBoundingClientRect();
+  sheet.classList.add('open');
 }
+
+function refreshAll() {
+  const active = document.querySelector('.page.active');
+  if(!active) return;
+  const id = active.id;
+  if(id === 'page-dashboard') { renderDashboard(); }
+  else if(id === 'page-saisie') { renderDashboard(); renderOperations(); }
+  else if(id === 'page-stats') { renderStats(); }
+  else if(id === 'page-settings') { renderSettings(); renderAccountsManage(); renderRecurring(); renderLoans(); }
+}
+
 function closeSheet(name) {
-  document.getElementById(name).classList.remove('open');
-  document.getElementById('overlay-'+name).classList.remove('open');
+  const sheet   = document.getElementById(name);
+  const overlay = document.getElementById('overlay-'+name);
+  if(!sheet || !overlay) return;
+  sheet.classList.remove('open');
+  overlay.classList.remove('open');
+  // Attendre fin de la transition CSS (300ms) puis rafraîchir
+  setTimeout(() => refreshAll(), 350);
 }
 
 // ════════════════════════════════════
@@ -1325,7 +1353,7 @@ function toggleAccountInclude(id) {
   const a = db.accounts.find(a=>a.id===id);
   if(!a) return;
   a.includeInTotal = (a.includeInTotal === false) ? true : false;
-  save(); renderAccountsManage(); renderDashboard();
+  save(); refreshAll();
 }
 
 function moveAccount(id, dir) {
@@ -1336,7 +1364,7 @@ function moveAccount(id, dir) {
   const tmp = db.accounts[idx];
   db.accounts[idx] = db.accounts[newIdx];
   db.accounts[newIdx] = tmp;
-  save(); renderAccountsManage(); renderDashboard();
+  save(); refreshAll();
 }
 
 function togglePointed(id) {
@@ -1468,12 +1496,13 @@ document.addEventListener('click', e=>{
 // ════════════════════════════════════
 function addTransaction() {
   const label    = document.getElementById('tx-label').value.trim();
-  const amount   = parseFloat(document.getElementById('tx-amount').value);
+  const rawAmt   = document.getElementById('tx-amount').value.replace(',', '.');
+  const amount   = parseFloat(rawAmt);
   const accountId= document.getElementById('tx-account').value;
   const category = document.getElementById('tx-category').value;
   const date     = document.getElementById('tx-date').value;
   if(!label) { document.getElementById('tx-label').focus(); return; }
-  if(!amount) { document.getElementById('tx-amount').focus(); return; }
+  if(!amount||isNaN(amount)) { document.getElementById('tx-amount').focus(); return; }
   if(!accountId) { document.getElementById('tx-account').focus(); return; }
 
   if(currentType === 'transfer') {
@@ -1489,13 +1518,14 @@ function addTransaction() {
 
 function addTransactionSheet() {
   const label    = document.getElementById('s-label').value.trim();
-  const amount   = parseFloat(document.getElementById('s-amount').value);
+  const rawAmt   = document.getElementById('s-amount').value.replace(',', '.');
+  const amount   = parseFloat(rawAmt);
   const accountId= document.getElementById('s-account').value;
   const category = document.getElementById('s-category').value;
   const date     = document.getElementById('s-date').value;
-  if(!label)   { document.getElementById('s-label').focus(); return; }
-  if(!amount)  { document.getElementById('s-amount').focus(); return; }
-  if(!accountId) { document.getElementById('s-account').focus(); return; }
+  if(!label)              { document.getElementById('s-label').focus(); return; }
+  if(!amount||isNaN(amount)) { document.getElementById('s-amount').focus(); return; }
+  if(!accountId)          { document.getElementById('s-account').focus(); return; }
 
   if(currentSheetType === 'transfer') {
     const toAccountId = document.getElementById('s-account-to').value;
@@ -1506,6 +1536,10 @@ function addTransactionSheet() {
   }
   document.getElementById('s-label').value='';
   document.getElementById('s-amount').value='';
+  // Fermer le dropdown autocomplétion et libérer le focus
+  const dd = document.getElementById('s-label-dropdown');
+  if(dd) dd.style.display = 'none';
+  document.activeElement?.blur();
   closeSheet('add-sheet');
 }
 
@@ -1513,7 +1547,7 @@ function pushTransaction(tx) {
   tx.id = Date.now().toString();
   db.transactions.unshift(tx);
   incrementLabelUse(tx.label, tx.category);
-  save(); renderDashboard(); renderStats(); renderOperations();
+  save(); requestAnimationFrame(() => refreshAll());
 }
 
 function pushTransfer({label, amount, fromAccountId, toAccountId, date}) {
@@ -1531,7 +1565,7 @@ function pushTransfer({label, amount, fromAccountId, toAccountId, date}) {
     type: 'income', isTransfer: true, transferId, transferFrom: fromAccountId
   });
   incrementLabelUse(label, 'savings');
-  save(); renderDashboard(); renderStats(); renderOperations();
+  save(); requestAnimationFrame(() => refreshAll());
 }
 
 function deleteTransaction(id) {
@@ -1540,12 +1574,12 @@ function deleteTransaction(id) {
   if(tx.isTransfer && tx.transferId) {
     confirmDelete('Supprimer ce virement ?', 'Les deux mouvements (débit et crédit) seront supprimés.', () => {
       db.transactions = db.transactions.filter(t=>t.transferId!==tx.transferId);
-      save(); renderDashboard(); renderStats(); renderOperations();
+      save(); requestAnimationFrame(() => refreshAll());
     });
   } else {
     confirmDelete('Supprimer cette opération ?', `"${tx.label}" — ${tx.amount} €`, () => {
       db.transactions = db.transactions.filter(t=>t.id!==id);
-      save(); renderDashboard(); renderStats(); renderOperations();
+      save(); requestAnimationFrame(() => refreshAll());
     });
   }
 }
@@ -1555,12 +1589,13 @@ function deleteTransaction(id) {
 // ════════════════════════════════════
 function addRecurring() {
   const label    = document.getElementById('rec-label').value.trim();
-  const amount   = parseFloat(document.getElementById('rec-amount').value);
+  const rawAmt   = document.getElementById('rec-amount').value.replace(',', '.');
+  const amount   = parseFloat(rawAmt);
   const accountId= document.getElementById('rec-account').value;
   const category = document.getElementById('rec-category').value;
   const day      = parseInt(document.getElementById('rec-day').value)||1;
   if(!label) { document.getElementById('rec-label').focus(); return; }
-  if(!amount) { document.getElementById('rec-amount').focus(); return; }
+  if(!amount||isNaN(amount)) { document.getElementById('rec-amount').focus(); return; }
   if(!accountId) { document.getElementById('rec-account').focus(); return; }
 
   const isTransfer = currentRecType === 'transfer';
@@ -1574,7 +1609,7 @@ function addRecurring() {
     type: currentRecType, active: true,
     ...(isTransfer ? { toAccountId } : {})
   });
-  save(); renderRecurring(); renderDashboard(); closeSheet('recurring-sheet');
+  save(); refreshAll(); closeSheet('recurring-sheet');
   document.getElementById('rec-label').value='';
   document.getElementById('rec-amount').value='';
   document.getElementById('rec-day').value='';
@@ -1586,7 +1621,7 @@ function deleteRecurring(id) {
   if(!r) return;
   confirmDelete('Supprimer cette récurrente ?', `"${r.label}" — ${r.amount} €`, () => {
     db.recurringCharges = db.recurringCharges.filter(r=>r.id!==id);
-    save(); renderRecurring(); renderDashboard();
+    save(); refreshAll();
   });
 }
 
@@ -1594,7 +1629,7 @@ function toggleRecurring(id) {
   const r = db.recurringCharges.find(r=>r.id===id);
   if(!r) return;
   r.active = (r.active === false) ? true : false;
-  save(); renderRecurring(); renderDashboard();
+  save(); refreshAll();
 }
 
 function openEditRecurring(id) {
@@ -2118,14 +2153,14 @@ function renderOperations() {
   // Grouper par mois
   const groups = {};
   txs.forEach(t => {
-    const key = t.date.substring(0,7); // YYYY-MM
+    const key = t.date.substring(0,7);
     if(!groups[key]) groups[key] = [];
     groups[key].push(t);
   });
 
   const monthNames = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 
-  el.innerHTML = Object.keys(groups).sort((a,b)=>b.localeCompare(a)).map(key => {
+  const newHTML = Object.keys(groups).sort((a,b)=>b.localeCompare(a)).map(key => {
     const [yr, mo] = key.split('-');
     const label = `${monthNames[parseInt(mo)-1]} ${yr}`;
     const items = groups[key];
@@ -2165,6 +2200,10 @@ function renderOperations() {
       </div>
       <div class="card" style="padding:0;overflow:hidden">${rows}</div>`;
   }).join('');
+
+  // Vider puis remplir pour forcer le repaint
+  el.innerHTML = '';
+  requestAnimationFrame(() => { el.innerHTML = newHTML; });
 }
 
 // ════════════════════════════════════
@@ -2908,7 +2947,7 @@ function saveEditLoan(id) {
 
   save();
   document.getElementById('edit-loan-modal').remove();
-  renderLoans(); renderRecurring(); renderDashboard();
+  refreshAll();
 }
 
 function deleteLoan(id) {
@@ -2917,7 +2956,7 @@ function deleteLoan(id) {
   confirmDelete(`Supprimer le prêt "${loan.label}" ?`, 'Les récurrentes associées seront aussi supprimées.', () => {
     db.loans = (db.loans||[]).filter(l=>l.id!==id);
     db.recurringCharges = db.recurringCharges.filter(r=>r.loanId!==id);
-    save(); renderLoans(); renderRecurring(); renderDashboard();
+    save(); refreshAll();
   });
 }
 
@@ -3049,7 +3088,7 @@ function confirmDelete(text, sub, onConfirm) {
   const btnOk     = document.getElementById('confirm-modal-ok');
   const btnCancel = document.getElementById('confirm-modal-cancel');
   const close = () => { modal.style.display = 'none'; btnOk.onclick = null; btnCancel.onclick = null; };
-  btnOk.onclick     = () => { close(); onConfirm(); };
+  btnOk.onclick     = () => { close(); setTimeout(() => { onConfirm(); requestAnimationFrame(() => refreshAll()); }, 50); };
   btnCancel.onclick = () => close();
 }
 
