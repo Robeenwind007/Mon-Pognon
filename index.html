@@ -456,7 +456,7 @@
 <div class="topbar">
   <h1>Mon<span>Pognon</span></h1>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px">
-    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.7.1</div>
+    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.7.2</div>
     <div style="display:flex;align-items:center;gap:6px">
       <div id="sync-status" style="font-size:10px;color:var(--muted)">…</div>
       <span onclick="forceSync()" title="Forcer la synchronisation"
@@ -870,7 +870,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '1.7.1';
+const APP_VERSION = '1.7.2';
 
 const DEFAULT_CATEGORIES = [
   { id:'salary',    label:'Salaire',      icon:'💼', color:'#10b981', system:true },
@@ -1931,6 +1931,58 @@ function renderDashboard() {
         </div>
       </div>`;
     }).join('');
+
+    // Section Prêts
+    if(db.loans && db.loans.length) {
+      accEl.innerHTML += `<div class="section-title" style="margin-top:16px">Prêts</div>`;
+      accEl.innerHTML += db.loans.map(loan => {
+        const stats = loanStats(loan);
+        const acc   = db.accounts.find(a=>a.id===loan.accountId);
+        const pct   = Math.round((stats.paid / loan.duration) * 100);
+        const monthlyTotal = loan.monthly + loan.insurance;
+        const now2 = new Date();
+        const monthKey2 = `${now2.getFullYear()}-${String(now2.getMonth()+1).padStart(2,'0')}`;
+        const rec = db.recurringCharges.find(r=>r.loanId===loan.id);
+        const started = rec ? isRecurringStarted(rec, monthKey2) : true;
+        const smk = rec?.startMonthKey||'';
+        const [smkY, smkM] = smk.split('-');
+        const nextLabel = started
+          ? `Prochain prélèvement le <strong>${loan.day}</strong>`
+          : `<span style="color:var(--accent)">📅 Démarre le ${loan.day}/${smkM||'?'}/${smkY||'?'}</span>`;
+
+        return `<div class="card" style="padding:14px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <div style="font-size:24px">🏦</div>
+            <div style="flex:1">
+              <div style="font-size:15px;font-weight:600">${loan.label}</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:1px">${acc?acc.icon+' '+acc.name:'?'}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:11px;color:var(--muted)">Capital restant</div>
+              <div style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:var(--red)">-${fmt(stats.capitalRemaining)}</div>
+            </div>
+          </div>
+          <div style="background:var(--bg3);border-radius:6px;height:5px;margin-bottom:8px">
+            <div style="background:var(--accent2);border-radius:6px;height:5px;width:${pct}%;transition:width .3s"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+            <div>
+              <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Mensualité</div>
+              <div style="font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:var(--red)">-${fmt(monthlyTotal)}</div>
+            </div>
+            <div style="border-left:1px solid var(--border);padding-left:8px">
+              <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Remboursé</div>
+              <div style="font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:var(--accent2)">${pct} %</div>
+            </div>
+            <div style="border-left:1px solid var(--border);padding-left:8px">
+              <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Restant</div>
+              <div style="font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:var(--text)">${stats.remaining} m.</div>
+            </div>
+          </div>
+          <div style="margin-top:8px;font-size:11px;color:var(--muted)">${nextLabel}</div>
+        </div>`;
+      }).join('');
+    }
   }
 
   // 3 dernières opérations passées
