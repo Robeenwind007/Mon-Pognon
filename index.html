@@ -456,7 +456,7 @@
 <div class="topbar">
   <h1>Mon<span>Pognon</span></h1>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px">
-    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.7.0</div>
+    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.7.1</div>
     <div style="display:flex;align-items:center;gap:6px">
       <div id="sync-status" style="font-size:10px;color:var(--muted)">…</div>
       <span onclick="forceSync()" title="Forcer la synchronisation"
@@ -870,7 +870,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.7.1';
 
 const DEFAULT_CATEGORIES = [
   { id:'salary',    label:'Salaire',      icon:'💼', color:'#10b981', system:true },
@@ -2515,16 +2515,17 @@ function importData(input) {
       return;
     }
 
-    const nbTx  = parsed.transactions.length;
-    const nbAcc = parsed.accounts.length;
+    const nbTx   = parsed.transactions.length;
+    const nbAcc  = parsed.accounts.length;
+    const nbLoans = (parsed.loans||[]).length;
 
     // Affiche modal de confirmation (évite confirm() qui peut être bloqué en PWA)
-    showImportConfirmModal(parsed, nbAcc, nbTx, input);
+    showImportConfirmModal(parsed, nbAcc, nbTx, nbLoans, input);
   };
   reader.readAsText(file, 'UTF-8');
 }
 
-function showImportConfirmModal(parsed, nbAcc, nbTx, input) {
+function showImportConfirmModal(parsed, nbAcc, nbTx, nbLoans, input) {
   const old = document.getElementById('import-confirm-modal');
   if(old) old.remove();
 
@@ -2539,6 +2540,7 @@ function showImportConfirmModal(parsed, nbAcc, nbTx, input) {
         Le fichier contient :<br>
         <strong style="color:var(--text)">${nbAcc}</strong> compte${nbAcc>1?'s':''} &nbsp;·&nbsp;
         <strong style="color:var(--text)">${nbTx}</strong> opération${nbTx>1?'s':''}
+        ${nbLoans > 0 ? `&nbsp;·&nbsp;<strong style="color:var(--text)">${nbLoans}</strong> prêt${nbLoans>1?'s':''}` : ''}
       </div>
       <div style="font-size:12px;color:var(--red);background:rgba(239,68,68,.1);border-radius:8px;padding:10px">
         ⚠️ Toutes les données actuelles seront <strong>remplacées</strong> par celles du fichier.
@@ -2564,6 +2566,7 @@ function confirmImport() {
     if(!parsed.categories) {
       parsed.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
     }
+    if(!parsed.loans) parsed.loans = [];
     db = parsed;
     save();
     populateSelects();
@@ -2571,12 +2574,15 @@ function confirmImport() {
     renderDashboard();
     renderAccountsManage();
     renderRecurring();
+    renderLoans();
     renderStats();
     renderSettings();
 
-    const nbTx  = db.transactions.length;
-    const nbAcc = db.accounts.length;
-    showBackupStatus(`✅ Restauration réussie — ${nbAcc} compte${nbAcc>1?'s':''}, ${nbTx} opération${nbTx>1?'s':''}`, 'var(--green)');
+    const nbTx   = db.transactions.length;
+    const nbAcc  = db.accounts.length;
+    const nbLoans = db.loans.length;
+    const loansStr = nbLoans > 0 ? `, ${nbLoans} prêt${nbLoans>1?'s':''}` : '';
+    showBackupStatus(`✅ Restauration réussie — ${nbAcc} compte${nbAcc>1?'s':''}, ${nbTx} opération${nbTx>1?'s':''}${loansStr}`, 'var(--green)');
   } catch(err) {
     showBackupStatus('❌ Erreur lors de la restauration : ' + err.message, 'var(--red)');
   }
