@@ -421,7 +421,7 @@
 <div class="topbar">
   <h1>Mon<span>Pognon</span></h1>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px">
-    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.5.1</div>
+    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.5.2</div>
     <div id="sync-status" style="font-size:10px;color:var(--muted)">…</div>
   </div>
 </div>
@@ -744,7 +744,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '1.5.1';
+const APP_VERSION = '1.5.2';
 
 const DEFAULT_CATEGORIES = [
   { id:'salary',    label:'Salaire',      icon:'💼', color:'#10b981', system:true },
@@ -2571,15 +2571,16 @@ async function syncPull() {
     if(!res.ok) { setSyncStatus('⚠ erreur sync', 'var(--orange)'); return false; }
     const rows = await res.json();
     if(rows.length && rows[0].data) {
-      const remote = rows[0].data;
-      // Prendre le plus récent entre local et distant
-      const localStr  = localStorage.getItem(STORAGE_KEY);
-      const localData = localStr ? JSON.parse(localStr) : null;
-      // On fusionne : on prend distant si plus de transactions ou si local vide
-      if(!localData || (remote.transactions && remote.transactions.length >= (localData.transactions||[]).length)) {
+      const remote     = rows[0].data;
+      const remoteTime = new Date(rows[0].updated_at).getTime();
+      const localMeta  = localStorage.getItem(STORAGE_KEY + '_updated');
+      const localTime  = localMeta ? parseInt(localMeta) : 0;
+      // Le plus récent gagne — point
+      if(remoteTime > localTime) {
         db = remote;
         if(!db.categories) db.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
         localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+        localStorage.setItem(STORAGE_KEY + '_updated', remoteTime);
         setSyncStatus('✓ synchronisé', 'var(--green)');
         return true;
       }
@@ -2595,7 +2596,9 @@ async function syncPull() {
 // Surcharge de save() pour pousser vers Supabase avec debounce
 const _saveLocal = save;
 function save() {
+  const now = Date.now();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+  localStorage.setItem(STORAGE_KEY + '_updated', now);
   clearTimeout(syncTimeout);
   syncTimeout = setTimeout(syncPush, 1500);
 }
