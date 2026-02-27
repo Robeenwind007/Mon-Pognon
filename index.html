@@ -456,7 +456,7 @@
 <div class="topbar">
   <h1>Auto<span>Thunes</span></h1>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px">
-    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.7.3</div>
+    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.7.4</div>
     <div style="display:flex;align-items:center;gap:6px">
       <div id="sync-status" style="font-size:10px;color:var(--muted)">…</div>
       <span onclick="forceSync()" title="Forcer la synchronisation"
@@ -870,7 +870,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '1.7.3';
+const APP_VERSION = '1.7.4';
 
 const DEFAULT_CATEGORIES = [
   { id:'salary',    label:'Salaire',      icon:'💼', color:'#10b981', system:true },
@@ -1056,7 +1056,7 @@ function addAccount() {
   const name = document.getElementById('acc-name').value.trim();
   const type = document.getElementById('acc-type')?.value || 'courant';
   const balance = parseFloat(document.getElementById('acc-balance').value)||0;
-  if(!name) { alert('Nom du compte obligatoire'); return; }
+  if(!name) { document.getElementById('acc-name').focus(); return; }
   const icon = ACCOUNT_TYPES[type]?.icon || selectedIcon;
   db.accounts.push({ id: Date.now().toString(), name, icon, type, initialBalance: balance, includeInTotal: true });
   save(); populateSelects(); renderDashboard(); renderAccountsManage(); closeSheet('account-sheet');
@@ -1311,7 +1311,7 @@ function saveEditAccount(id) {
   const a = db.accounts.find(a=>a.id===id);
   if(!a) return;
   const name = document.getElementById('edit-acc-name').value.trim();
-  if(!name) { alert('Nom obligatoire'); return; }
+  if(!name) { document.getElementById('edit-acc-name')?.focus(); return; }
   a.name           = name;
   a.type           = document.getElementById('edit-acc-type').value;
   a.icon           = window._editAccIcon || ACCOUNT_TYPES[a.type]?.icon || '🏦';
@@ -1472,18 +1472,19 @@ function addTransaction() {
   const accountId= document.getElementById('tx-account').value;
   const category = document.getElementById('tx-category').value;
   const date     = document.getElementById('tx-date').value;
-  if(!label||!amount||!accountId) { alert('Remplissez tous les champs'); return; }
+  if(!label) { document.getElementById('tx-label').focus(); return; }
+  if(!amount) { document.getElementById('tx-amount').focus(); return; }
+  if(!accountId) { document.getElementById('tx-account').focus(); return; }
 
   if(currentType === 'transfer') {
     const toAccountId = document.getElementById('tx-account-to').value;
-    if(!toAccountId || toAccountId===accountId) { alert('Choisissez un compte destinataire différent'); return; }
+    if(!toAccountId || toAccountId===accountId) { document.getElementById('tx-account-to').focus(); return; }
     pushTransfer({label, amount, fromAccountId:accountId, toAccountId, date});
   } else {
     pushTransaction({label, amount, accountId, category, date, type:currentType, isRecurring:false});
   }
   document.getElementById('tx-label').value='';
   document.getElementById('tx-amount').value='';
-  alert('Opération enregistrée ✓');
 }
 
 function addTransactionSheet() {
@@ -1492,11 +1493,13 @@ function addTransactionSheet() {
   const accountId= document.getElementById('s-account').value;
   const category = document.getElementById('s-category').value;
   const date     = document.getElementById('s-date').value;
-  if(!label||!amount||!accountId) { alert('Remplissez tous les champs'); return; }
+  if(!label)   { document.getElementById('s-label').focus(); return; }
+  if(!amount)  { document.getElementById('s-amount').focus(); return; }
+  if(!accountId) { document.getElementById('s-account').focus(); return; }
 
   if(currentSheetType === 'transfer') {
     const toAccountId = document.getElementById('s-account-to').value;
-    if(!toAccountId || toAccountId===accountId) { alert('Choisissez un compte destinataire différent'); return; }
+    if(!toAccountId || toAccountId===accountId) { document.getElementById('s-account-to').focus(); return; }
     pushTransfer({label, amount, fromAccountId:accountId, toAccountId, date});
   } else {
     pushTransaction({label, amount, accountId, category, date, type:currentSheetType, isRecurring:false});
@@ -1556,12 +1559,14 @@ function addRecurring() {
   const accountId= document.getElementById('rec-account').value;
   const category = document.getElementById('rec-category').value;
   const day      = parseInt(document.getElementById('rec-day').value)||1;
-  if(!label||!amount||!accountId) { alert('Remplissez tous les champs'); return; }
+  if(!label) { document.getElementById('rec-label').focus(); return; }
+  if(!amount) { document.getElementById('rec-amount').focus(); return; }
+  if(!accountId) { document.getElementById('rec-account').focus(); return; }
 
   const isTransfer = currentRecType === 'transfer';
   const toAccountId = isTransfer ? document.getElementById('rec-account-to').value : null;
   if(isTransfer && (!toAccountId || toAccountId===accountId)) {
-    alert('Choisissez un compte destinataire différent'); return;
+    document.getElementById('rec-account-to')?.focus(); return;
   }
 
   db.recurringCharges.push({
@@ -1675,7 +1680,9 @@ function saveEditRecurring(id) {
   const accountId = document.getElementById('edit-rec-account').value;
   const day    = parseInt(document.getElementById('edit-rec-day').value)||1;
 
-  if(!label || !amount || !accountId) { alert('Remplissez tous les champs'); return; }
+  if(!label) { return; }
+  if(!amount) { return; }
+  if(!accountId) { return; }
 
   r.label     = label;
   r.amount    = amount;
@@ -1685,7 +1692,7 @@ function saveEditRecurring(id) {
   const isTransfer = r.type === 'transfer';
   if(isTransfer) {
     const toAccountId = document.getElementById('edit-rec-account-to').value;
-    if(!toAccountId || toAccountId === accountId) { alert('Choisissez un compte destinataire différent'); return; }
+    if(!toAccountId || toAccountId === accountId) { return; }
     r.toAccountId = toAccountId;
   } else {
     r.category = document.getElementById('edit-rec-category').value;
@@ -2725,7 +2732,7 @@ function deleteCategory(id) {
   if(!cat || cat.system) return;
   const uses = db.transactions.filter(t=>t.category===id).length
              + db.recurringCharges.filter(r=>r.category===id).length;
-  if(uses > 0) { alert(`Cette catégorie est utilisée dans ${uses} opération(s).`); return; }
+  if(uses > 0) { return; }
   confirmDelete(`Supprimer la catégorie "${cat.label}" ?`, 'Cette action est irréversible.', () => {
     db.categories = db.categories.filter(c=>c.id!==id);
     save(); populateSelects(); renderSettings();
