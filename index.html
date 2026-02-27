@@ -420,7 +420,7 @@
 <!-- TOP BAR -->
 <div class="topbar">
   <h1>Mon<span>Pognon</span></h1>
-  <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.4.7</div>
+  <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.4.9</div>
 </div>
 
 <!-- MAIN -->
@@ -741,7 +741,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '1.4.7';
+const APP_VERSION = '1.4.9';
 
 const DEFAULT_CATEGORIES = [
   { id:'salary',    label:'Salaire',      icon:'💼', color:'#10b981', system:true },
@@ -1201,6 +1201,16 @@ function moveAccount(id, dir) {
   save(); renderAccountsManage(); renderDashboard();
 }
 
+function togglePointed(id) {
+  const r = db.recurringCharges.find(r=>r.id===id);
+  if(!r) return;
+  const now = new Date();
+  const monthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  if(!r.pointed) r.pointed = {};
+  r.pointed[monthKey] = !r.pointed[monthKey];
+  save(); renderDashboard();
+}
+
 // ════════════════════════════════════
 //  LIBELLÉS SAUVEGARDÉS
 // ════════════════════════════════════
@@ -1572,8 +1582,10 @@ function renderRecurring() {
   const totalIncomes = list.filter(r=>r.type==='income'  && r.active!==false).reduce((s,r)=>s+r.amount,0);
 
   // SOLDE RÉCURRENT NET = actives filtrées dont le jour est > aujourd'hui (reste du mois)
-  const netCharges = list.filter(r=>r.type==='expense' && r.active!==false && r.day>todayDay && db.accounts.find(a=>a.id===r.accountId)?.includeInTotal!==false).reduce((s,r)=>s+r.amount,0);
-  const netIncomes = list.filter(r=>r.type==='income'  && r.active!==false && r.day>todayDay && db.accounts.find(a=>a.id===r.accountId)?.includeInTotal!==false).reduce((s,r)=>s+r.amount,0);
+  const now2 = new Date();
+  const curMonthKey = `${now2.getFullYear()}-${String(now2.getMonth()+1).padStart(2,'0')}`;
+  const netCharges = list.filter(r=>r.type==='expense' && r.active!==false && r.day>todayDay && db.accounts.find(a=>a.id===r.accountId)?.includeInTotal!==false && !(r.pointed && r.pointed[curMonthKey])).reduce((s,r)=>s+r.amount,0);
+  const netIncomes = list.filter(r=>r.type==='income'  && r.active!==false && r.day>todayDay && db.accounts.find(a=>a.id===r.accountId)?.includeInTotal!==false && !(r.pointed && r.pointed[curMonthKey])).reduce((s,r)=>s+r.amount,0);
   const netBalance = netIncomes - netCharges;
 
   // Trier : produits d'abord, puis charges, puis virements — puis par jour
@@ -1686,8 +1698,9 @@ function renderDashboard() {
   const totalMonth = db.accounts.filter(a=>a.includeInTotal!==false).reduce((s,a)=>s+accountMonthBalance(a.id),0);
 
   // Opérations récurrentes restantes ce mois (jour > aujourd'hui, actives uniquement)
-  const pendingCharges = db.recurringCharges.filter(r=>r.active!==false && r.type==='expense' && r.day>todayDay);
-  const pendingIncomes = db.recurringCharges.filter(r=>r.active!==false && r.type==='income'  && r.day>todayDay);
+  const dashMonthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const pendingCharges = db.recurringCharges.filter(r=>r.active!==false && r.type==='expense' && r.day>todayDay && !(r.pointed && r.pointed[dashMonthKey]) && db.accounts.find(a=>a.id===r.accountId)?.includeInTotal!==false);
+  const pendingIncomes = db.recurringCharges.filter(r=>r.active!==false && r.type==='income'  && r.day>todayDay && !(r.pointed && r.pointed[dashMonthKey]) && db.accounts.find(a=>a.id===r.accountId)?.includeInTotal!==false);
   const totalPendingOut = pendingCharges.reduce((s,r)=>s+r.amount,0);
   const totalPendingIn  = pendingIncomes.reduce((s,r)=>s+r.amount,0);
   const totalPending    = totalPendingOut - totalPendingIn; // net
@@ -1805,26 +1818,29 @@ function renderDashboard() {
 
   const yr  = now.getFullYear();
   const mo  = String(now.getMonth()+1).padStart(2,'0');
+  const monthKey = `${yr}-${mo}`;
 
   const upEl = document.getElementById('upcoming-tx-list');
   if(!upcoming.length) {
     upEl.innerHTML='<div class="empty-state"><span class="emoji">⏳</span><p>Aucune opération à venir ce mois</p></div>';
   } else {
     upEl.innerHTML = upcoming.map(r => {
-      const acc     = db.accounts.find(a=>a.id===r.accountId);
-      const toAcc   = r.toAccountId ? db.accounts.find(a=>a.id===r.toAccountId) : null;
-      const cat     = CATEGORIES.find(c=>c.id===r.category)||CATEGORIES[8];
+      const acc      = db.accounts.find(a=>a.id===r.accountId);
+      const toAcc    = r.toAccountId ? db.accounts.find(a=>a.id===r.toAccountId) : null;
+      const cat      = CATEGORIES.find(c=>c.id===r.category)||CATEGORIES[8];
       const isTransfer = r.type==='transfer';
       const isIncome   = r.type==='income';
-      const icon    = isTransfer ? '⇄' : cat.icon;
-      const bgCol   = isTransfer ? 'rgba(59,130,246,.12)' : isIncome ? 'rgba(16,185,129,.12)' : 'rgba(244,63,94,.12)';
+      const icon     = isTransfer ? '⇄' : cat.icon;
+      const bgCol    = isTransfer ? 'rgba(59,130,246,.12)' : isIncome ? 'rgba(16,185,129,.12)' : 'rgba(244,63,94,.12)';
       const amtColor = isTransfer ? 'color:var(--accent)' : isIncome ? 'color:var(--green)' : 'color:var(--red)';
       const amtPrefix = isTransfer ? '⇄' : isIncome ? '+' : '-';
-      const dateStr = `${yr}-${mo}-${String(r.day).padStart(2,'0')}`;
-      const subText = isTransfer
+      const dateStr  = `${yr}-${mo}-${String(r.day).padStart(2,'0')}`;
+      const subText  = isTransfer
         ? `${dateStr} · ${acc?acc.name:'?'} → ${toAcc?toAcc.name:'?'}`
         : `${dateStr} · ${acc?acc.name:'?'} · ${cat.label}`;
-      return `<div class="tx-item">
+      const pointed  = r.pointed && r.pointed[monthKey];
+      const pointedStyle = pointed ? 'opacity:.45;text-decoration:line-through' : '';
+      return `<div class="tx-item" style="${pointedStyle}">
         <div class="tx-icon" style="background:${bgCol};font-size:${isTransfer?'16px':'18px'}">${icon}</div>
         <div class="tx-info">
           <div class="tx-name">${r.label}</div>
@@ -1832,7 +1848,14 @@ function renderDashboard() {
         </div>
         <div style="text-align:right">
           <div class="tx-amount" style="${amtColor}">${amtPrefix}${fmt(r.amount)}</div>
-          <div style="font-size:10px;color:var(--orange);font-weight:600;margin-top:2px">J-${r.day - todayDay}</div>
+          <div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:3px">
+            <span style="font-size:10px;color:var(--orange);font-weight:600">J-${r.day - todayDay}</span>
+            <label style="display:inline-flex;align-items:center;gap:3px;cursor:pointer;font-size:10px;color:${pointed?'var(--green)':'var(--muted)'};font-weight:${pointed?'700':'400'}">
+              <input type="checkbox" ${pointed?'checked':''} onchange="togglePointed('${r.id}')"
+                style="width:13px;height:13px;accent-color:var(--green);cursor:pointer">
+              Comptabilisé
+            </label>
+          </div>
         </div>
       </div>`;
     }).join('');
