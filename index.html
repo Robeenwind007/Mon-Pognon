@@ -411,6 +411,47 @@
   .cta-banner .cta-icon { font-size:36px; margin-bottom:8px; }
   .cta-banner p { font-size:13px; color:var(--muted); margin-bottom:14px; line-height:1.5; }
   .cta-banner .btn { max-width:260px; margin:0 auto; }
+
+  /* ─── PEA ─── */
+  .holding-card {
+    background:var(--card); border-radius:14px; padding:14px 16px;
+    margin-bottom:10px; border:1px solid var(--border);
+  }
+  .holding-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .holding-ticker {
+    font-family:'DM Mono',monospace; font-size:15px; font-weight:700;
+    color:var(--accent2); background:rgba(34,211,238,.1);
+    padding:3px 8px; border-radius:6px; letter-spacing:.5px;
+  }
+  .holding-name { font-size:13px; color:var(--muted); margin-top:2px; }
+  .holding-price { font-family:'DM Mono',monospace; font-size:18px; font-weight:700; text-align:right; }
+  .holding-change { font-size:11px; font-weight:600; text-align:right; margin-top:2px; }
+  .holding-grid {
+    display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;
+    padding-top:10px; border-top:1px solid var(--border);
+  }
+  .holding-stat { text-align:center; }
+  .holding-stat-label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:3px; }
+  .holding-stat-value { font-family:'DM Mono',monospace; font-size:13px; font-weight:600; }
+  .holding-actions { display:flex; gap:6px; margin-top:10px; }
+  .holding-btn {
+    flex:1; padding:7px; border-radius:8px; border:1px solid var(--border);
+    background:var(--bg3); color:var(--muted); font-size:12px; font-weight:600;
+    cursor:pointer; text-align:center;
+  }
+  .holding-btn.danger { color:var(--red); border-color:rgba(244,63,94,.3); }
+  .holding-type-badge {
+    font-size:10px; font-weight:600; padding:2px 7px; border-radius:5px;
+    text-transform:uppercase; letter-spacing:.3px;
+  }
+  .badge-stock  { background:rgba(59,130,246,.15); color:#60a5fa; }
+  .badge-etf    { background:rgba(16,185,129,.15); color:#34d399; }
+  .badge-fcp    { background:rgba(168,85,247,.15);  color:#c084fc; }
+  .badge-crypto { background:rgba(245,158,11,.15); color:#fbbf24; }
+  .pea-loading { text-align:center; padding:8px; font-size:12px; color:var(--muted); }
+  @keyframes pea-spin { to { transform:rotate(360deg); } }
+  .pea-spinning { display:inline-block; animation:pea-spin .7s linear infinite; }
+
 </style>
 </head>
 <body>
@@ -458,7 +499,7 @@
 <div class="topbar">
   <h1>Auto<span>Thunes</span></h1>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px">
-    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.8.7</div>
+    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.9.3</div>
     <div style="display:flex;align-items:center;gap:6px">
       <div id="sync-status" style="font-size:10px;color:var(--muted)">…</div>
       <span onclick="forceSync()" title="Forcer la synchronisation"
@@ -590,8 +631,26 @@
   <!-- ══ PAGE: PARAMÈTRES ══ -->
   <div class="page" id="page-settings"><div style="display:flex;justify-content:flex-end;margin-bottom:4px"><button onclick="renderSettings();renderAccountsManage();renderRecurring();renderLoans()" style="background:var(--bg3);border:none;color:var(--muted);font-size:12px;padding:5px 10px;border-radius:10px;cursor:pointer">↺ Actualiser</button></div>
 
+    <!-- ── PEA / FINNHUB ── -->
+    <div class="section-title" style="margin-top:0">Cotations PEA</div>
+    <div class="card" id="finnhub-settings-card" style="padding:14px 16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div>
+          <div style="font-size:14px;font-weight:600;color:var(--text)">Clé API Finnhub</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">Gratuite sur finnhub.io</div>
+        </div>
+        <div id="finnhub-key-status"></div>
+      </div>
+      <div id="finnhub-key-display" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);margin-bottom:10px;word-break:break-all"></div>
+      <button onclick="showFinnhubKeyPrompt()" class="btn btn-primary" style="width:100%;font-size:13px">
+        🔑 Configurer la clé API
+      </button>
+    </div>
+
+    <div style="height:16px"></div>
+
     <!-- ── APPARENCE ── -->
-    <div class="section-title" style="margin-top:0">Apparence</div>
+    <div class="section-title">Apparence</div>
     <div class="card" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px">
       <div>
         <div style="font-size:14px;font-weight:600;color:var(--text)">Thème</div>
@@ -750,6 +809,62 @@
     </div>
   </div>
 
+  <!-- ══ PAGE: PEA ══ -->
+  <div class="page" id="page-pea">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:4px">
+      <button onclick="renderPea()" style="background:var(--bg3);border:none;color:var(--muted);font-size:12px;padding:5px 10px;border-radius:10px;cursor:pointer">↺ Actualiser</button>
+    </div>
+
+    <!-- Résumé portefeuille -->
+    <div class="balance-grid">
+      <div class="card">
+        <div class="card-label">Investi</div>
+        <div class="card-value" id="pea-total-cost" style="font-size:20px">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Valorisation</div>
+        <div class="card-value blue" id="pea-total-value" style="font-size:20px">—</div>
+      </div>
+      <div class="card" style="grid-column:1/-1">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="card-label">Plus-value latente</div>
+            <div class="card-value" id="pea-total-pnl" style="font-size:22px">—</div>
+          </div>
+          <div style="text-align:right">
+            <div class="card-label">Performance</div>
+            <div id="pea-total-pct" style="font-size:22px;font-weight:700">—</div>
+          </div>
+        </div>
+        <div id="pea-last-update" style="margin-top:6px;font-size:11px;color:var(--muted)"></div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div class="section-title" style="margin:0">Positions</div>
+      <div style="display:flex;gap:8px">
+        <button onclick="refreshPeaPrices()" id="pea-refresh-btn"
+          style="background:var(--bg3);border:1px solid var(--border);color:var(--accent2);font-size:12px;padding:6px 12px;border-radius:10px;cursor:pointer;font-weight:600">
+          ↺ Cotations
+        </button>
+        <button onclick="exportPortfolioCsv()"
+          style="background:var(--bg3);border:1px solid var(--border);color:var(--muted);font-size:12px;padding:6px 12px;border-radius:10px;cursor:pointer;font-weight:600">
+          ↓ Export
+        </button>
+        <button onclick="openAddHolding()"
+          style="background:var(--accent2);border:none;color:#0f172a;font-size:12px;padding:6px 14px;border-radius:10px;cursor:pointer;font-weight:700">
+          + Ajouter
+        </button>
+      </div>
+    </div>
+
+    <!-- Liste positions -->
+    <div id="pea-holdings-list">
+      <div class="empty-state"><span class="emoji">📈</span><p>Aucune position.<br>Ajoutez votre première valeur.</p></div>
+    </div>
+  </div>
+
 </div>
 
 <!-- BOTTOM NAV -->
@@ -770,6 +885,10 @@
   <div class="nav-item" onclick="showPage('stats',this)">
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
     Stats
+  </div>
+  <div class="nav-item" onclick="showPage('pea',this)">
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+    PEA
   </div>
   <div class="nav-item" onclick="showPage('settings',this)">
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
@@ -879,7 +998,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '1.8.7';
+const APP_VERSION = '1.9.3';
 
 const DEFAULT_CATEGORIES = [
   { id:'salary',    label:'Salaire',      icon:'💼', color:'#10b981', system:true },
@@ -894,7 +1013,7 @@ const DEFAULT_CATEGORIES = [
 ];
 
 function defaultDb() {
-  return { accounts:[], transactions:[], recurringCharges:[], labels:[], categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)) };
+  return { accounts:[], transactions:[], recurringCharges:[], labels:[], categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)), loans:[], holdings:[] };
 }
 function load() {
   try {
@@ -930,6 +1049,7 @@ function init() {
   applyTheme(localStorage.getItem('mp_theme') || 'dark');
   if(!db.categories) { db.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)); saveLocal(); }
   if(!db.loans) { db.loans = []; }
+  if(!db.holdings) { db.holdings = []; }
   fillDateFields();
   populateSelects();
   applyRecurringIfNeeded();
@@ -978,7 +1098,8 @@ function showPage(name, el) {
   if(el) el.classList.add('active');
   if(name==='stats') renderStats();
   if(name==='saisie') { renderOperations(); }
-  if(name==='settings') { renderSettings(); renderAccountsManage(); renderRecurring(); renderLoans(); applyTheme(localStorage.getItem('mp_theme') || 'dark'); }
+  if(name==='pea') { renderPea(); }
+  if(name==='settings') { renderSettings(); renderSettingsFinnhub(); renderAccountsManage(); renderRecurring(); renderLoans(); applyTheme(localStorage.getItem('mp_theme') || 'dark'); }
 }
 
 // ════════════════════════════════════
@@ -1003,7 +1124,8 @@ function refreshAll() {
   if(id === 'page-dashboard') { renderDashboard(); }
   else if(id === 'page-saisie') { renderDashboard(); renderOperations(); }
   else if(id === 'page-stats') { renderStats(); }
-  else if(id === 'page-settings') { renderSettings(); renderAccountsManage(); renderRecurring(); renderLoans(); }
+  else if(id === 'page-pea') { renderPea(); }
+  else if(id === 'page-settings') { renderSettings(); renderSettingsFinnhub(); renderAccountsManage(); renderRecurring(); renderLoans(); }
 }
 
 function closeSheet(name) {
@@ -2292,11 +2414,18 @@ function renderOperations() {
       const sub    = isT
         ? `${t.date} · ${acc?acc.name:'?'} → ${toAcc?toAcc.name:'?'}`
         : `${t.date} · ${acc?acc.name:'?'} · ${cat.label}`;
-      return `<div class="tx-item">
+
+      const today   = new Date().toISOString().substring(0,10);
+      const isFuture = t.date > today;
+      const futureStyle = isFuture
+        ? 'opacity:.55;font-style:italic;background:repeating-linear-gradient(135deg,transparent,transparent 6px,rgba(255,255,255,.015) 6px,rgba(255,255,255,.015) 12px)'
+        : '';
+
+      return `<div class="tx-item" style="${futureStyle}">
         <div class="tx-icon" style="background:${bgCol};font-size:${isT?'16px':'18px'}">${icon}</div>
         <div class="tx-info">
           <div class="tx-name">${t.label}</div>
-          <div class="tx-sub">${sub}</div>
+          <div class="tx-sub">${sub}${isFuture ? ' · <span style="color:var(--accent2);font-style:normal;font-size:10px;font-weight:600">À VENIR</span>' : ''}</div>
         </div>
         <div style="text-align:right">
           <div class="tx-amount" style="color:${amtCol}">${prefix}${fmt(t.amount)}</div>
@@ -2623,9 +2752,21 @@ function renderSettings() {
   }
 }
 
-// ════════════════════════════════════
-//  SAUVEGARDE & RESTAURATION
-// ════════════════════════════════════
+function renderSettingsFinnhub() {
+  const key = getFinnhubKey();
+  const statusEl  = document.getElementById('finnhub-key-status');
+  const displayEl = document.getElementById('finnhub-key-display');
+  if(!statusEl || !displayEl) return;
+  if(key) {
+    statusEl.innerHTML  = '<span style="color:var(--green);font-size:12px;font-weight:600">✓ Configurée</span>';
+    // Masquer partiellement la clé : cxxxxxxx…xxxx
+    const masked = key.length > 8 ? key.slice(0,4) + '••••••••' + key.slice(-4) : '••••••••';
+    displayEl.textContent = masked;
+  } else {
+    statusEl.innerHTML  = '<span style="color:var(--orange);font-size:12px;font-weight:600">⚠ Non configurée</span>';
+    displayEl.textContent = 'Aucune clé enregistrée';
+  }
+}
 
 function exportData() {
   try {
@@ -3394,8 +3535,9 @@ function rowToLabel(r) {
 // Suivi des entités modifiées depuis le dernier push
 let _dirty = { accounts: new Set(), transactions: new Set(), recurring: new Set(),
                loans: new Set(), categories: new Set(), labels: new Set(),
+               holdings: new Set(),
                deletedTx: new Set(), deletedRec: new Set(), deletedAccounts: new Set(),
-               deletedLoans: new Set(), deletedCategories: new Set(),
+               deletedLoans: new Set(), deletedCategories: new Set(), deletedHoldings: new Set(),
                newApplied: [] };
 
 function markDirty(type, id) {
@@ -3482,11 +3624,23 @@ async function syncPush() {
       if(rows.length) await sbUpsert('labels', rows);
     }
 
+    // Holdings PEA
+    if(_dirty.holdings.size > 0) {
+      const rows = (db.holdings || [])
+        .filter(h => _dirty.holdings.has(h.id))
+        .map(holdingToRow);
+      if(rows.length) await sbUpsert('holdings', rows);
+    }
+    if(_dirty.deletedHoldings.size > 0) {
+      await sbDelete('holdings', [..._dirty.deletedHoldings]);
+    }
+
     // Reset dirty
     _dirty = { accounts: new Set(), transactions: new Set(), recurring: new Set(),
                loans: new Set(), categories: new Set(), labels: new Set(),
+               holdings: new Set(),
                deletedTx: new Set(), deletedRec: new Set(), deletedAccounts: new Set(),
-               deletedLoans: new Set(), deletedCategories: new Set(),
+               deletedLoans: new Set(), deletedCategories: new Set(), deletedHoldings: new Set(),
                newApplied: [] };
 
     setSyncStatus('✓ synchronisé', 'var(--green)');
@@ -3510,7 +3664,7 @@ async function syncPull() {
     // Chargement parallèle de toutes les tables
     const [
       accRows, txRows, recRows, appliedRows,
-      loanRows, catRows, labelRows
+      loanRows, catRows, labelRows, holdingRows
     ] = await Promise.all([
       sbSelect('accounts', 'order=sort_order.asc,created_at.asc'),
       sbSelect('transactions', 'order=date.desc,created_at.desc'),
@@ -3518,7 +3672,8 @@ async function syncPull() {
       sbSelect('recurring_applied'),
       sbSelect('loans', 'order=created_at.asc'),
       sbSelect('categories', 'order=created_at.asc'),
-      sbSelect('labels', 'order=uses.desc')
+      sbSelect('labels', 'order=uses.desc'),
+      sbSelect('holdings', 'order=created_at.asc')
     ]);
 
     // Construire la map applied par recurring_id
@@ -3541,6 +3696,7 @@ async function syncPull() {
     const customCats = catRows.filter(r => !r.system).map(rowToCategory);
     db.categories = [...DEFAULT_CATEGORIES, ...customCats];
     db.labels     = labelRows.map(rowToLabel);
+    db.holdings   = holdingRows.map(rowToHolding);
 
     saveLocal();
     setSyncStatus('✓ synchronisé', 'var(--green)');
@@ -3572,8 +3728,592 @@ async function start() {
   }
 }
 
-init();
-start();
+// ════════════════════════════════════
+//  PEA — CONVERTISSEURS
+// ════════════════════════════════════
+function holdingToRow(h) {
+  return {
+    id:          h.id,
+    ticker:      h.ticker,
+    name:        h.name || h.ticker,
+    asset_type:  h.assetType || 'stock',
+    quantity:    parseFloat(h.quantity) || 0,
+    avg_price:   parseFloat(h.avgPrice) || 0,
+    currency:    'EUR', // avgPrice toujours saisi en EUR
+    last_price:  h.lastPrice  ? parseFloat(h.lastPrice)  : null, // toujours en EUR après conversion
+    last_change: h.lastChange ? parseFloat(h.lastChange) : null,
+    last_update: h.lastUpdate || null,
+    quote_currency: h.quoteCurrency || 'EUR'
+  };
+}
+function rowToHolding(r) {
+  return {
+    id:         r.id,
+    ticker:     r.ticker,
+    name:       r.name,
+    assetType:  r.asset_type || 'stock',
+    quantity:   parseFloat(r.quantity),
+    avgPrice:   parseFloat(r.avg_price),
+    currency:   'EUR', // on force EUR — last_price est toujours converti avant stockage
+    lastPrice:  r.last_price  ? parseFloat(r.last_price)  : null,
+    lastChange: r.last_change ? parseFloat(r.last_change) : null,
+    lastUpdate:    r.last_update || null,
+    exchange:      r.exchange || '',
+    quoteCurrency: r.quote_currency || 'EUR'
+  };
+}
+
+// ════════════════════════════════════
+//  PEA — COTATIONS (Finnhub + CoinGecko)
+// ════════════════════════════════════
+
+const FINNHUB_API = 'https://finnhub.io/api/v1';
+const CG_API      = 'https://api.coingecko.com/api/v3/simple/price';
+const FX_API      = 'https://api.frankfurter.app/latest';
+
+// Cache du taux de change (valable 1h)
+let _fxRates = {};
+let _fxFetchTs = 0;
+
+async function getFxRate(from, to = 'EUR') {
+  if(from === to) return 1;
+  const cacheKey = `${from}_${to}`;
+  const now = Date.now();
+  if(_fxRates[cacheKey] && (now - _fxFetchTs) < 3600000) return _fxRates[cacheKey];
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000); // 5s max
+    const res = await fetch(`${FX_API}?from=${from}&to=${to}`, { signal: controller.signal });
+    clearTimeout(timeout);
+    if(!res.ok) return null;
+    const data = await res.json();
+    const rate = data.rates?.[to];
+    if(rate) { _fxRates[cacheKey] = rate; _fxFetchTs = now; }
+    return rate || null;
+  } catch(e) {
+    console.warn('FX rate error (timeout ou réseau):', from, to, e.message);
+    return null;
+  }
+}
+
+function getFinnhubKey() {
+  return localStorage.getItem('finnhub_key') || '';
+}
+
+async function fetchFinnhubPrice(ticker) {
+  const key = getFinnhubKey();
+  if(!key) return { error: 'no_key' };
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000); // 8s max
+    const res = await fetch(`${FINNHUB_API}/quote?symbol=${encodeURIComponent(ticker)}&token=${key}`, { signal: controller.signal });
+    clearTimeout(timeout);
+    if(res.status === 401 || res.status === 403) return { error: 'bad_key' };
+    if(!res.ok) return null;
+    const quote = await res.json();
+    if(!quote.c || quote.c === 0) return null;
+    return { price: quote.c, change: quote.dp || 0, currency: 'USD', exchange: 'Finnhub' };
+  } catch(e) {
+    console.warn('Finnhub error for', ticker, e.message);
+    return null;
+  }
+}
+
+async function fetchCryptoPrice(coinId) {
+  try {
+    const url = `${CG_API}?ids=${encodeURIComponent(coinId)}&vs_currencies=eur&include_24hr_change=true`;
+    const res = await fetch(url);
+    if(!res.ok) return null;
+    const data = await res.json();
+    const entry = data[coinId];
+    if(!entry) return null;
+    return { price: entry.eur, change: entry.eur_24h_change || 0, currency: 'EUR' };
+  } catch(e) {
+    console.warn('CoinGecko error for', coinId, e);
+    return null;
+  }
+}
+
+async function fetchPrice(holding) {
+  if(holding.assetType === 'crypto') {
+    return await fetchCryptoPrice(holding.ticker.toLowerCase());
+  } else {
+    const result = await fetchFinnhubPrice(holding.ticker.toUpperCase());
+    if(result && result.price && !result.error) {
+      result.currency = holding.quoteCurrency || 'EUR';
+    }
+    return result;
+  }
+}
+
+async function refreshPeaPrices() {
+  const btn = document.getElementById('pea-refresh-btn');
+
+  // Vérifier la clé Finnhub avant tout
+  if(!getFinnhubKey()) {
+    // Vérifier s'il y a des actifs non-crypto
+    const hasStocks = (db.holdings||[]).some(h => h.assetType !== 'crypto');
+    if(hasStocks) {
+      showFinnhubKeyPrompt();
+      return;
+    }
+  }
+
+  if(btn) { btn.innerHTML = '<span class="pea-spinning">↺</span> Cotations'; btn.disabled = true; }
+
+  const holdings = db.holdings || [];
+  if(!holdings.length) {
+    if(btn) { btn.innerHTML = '↺ Cotations'; btn.disabled = false; }
+    return;
+  }
+
+  try {
+    // Fetch toutes les cotations en parallèle
+    const results = await Promise.all(holdings.map(h => fetchPrice(h)));
+
+    // Détecter erreur de clé
+    const badKey = results.some(r => r && r.error === 'bad_key');
+    if(badKey) {
+      showFinnhubKeyPrompt('Clé API invalide. Vérifie ta clé Finnhub.');
+      return;
+    }
+
+    // Collecter les devises non-EUR pour récupérer les taux de change
+    const foreignCurrencies = [...new Set(
+      results.filter(r => r && r.price && !r.error && r.currency && r.currency !== 'EUR')
+             .map(r => r.currency)
+    )];
+    const fxRates = {};
+    await Promise.all(foreignCurrencies.map(async cur => {
+      const rate = await getFxRate(cur, 'EUR');
+      if(rate) fxRates[cur] = rate;
+    }));
+
+    let updated = false;
+    holdings.forEach((h, i) => {
+      const r = results[i];
+      if(r && r.price && !r.error) {
+        const rawPrice    = r.price;
+        const rawCurrency = r.currency || 'EUR';
+        const fxRate      = rawCurrency !== 'EUR' ? (fxRates[rawCurrency] || null) : 1;
+        h.lastPrice       = fxRate ? parseFloat((rawPrice * fxRate).toFixed(4)) : rawPrice;
+        h.lastPriceRaw    = rawCurrency !== 'EUR' ? rawPrice : null;
+        h.lastChange      = r.change;
+        h.currency        = 'EUR';
+        h.fxRate          = rawCurrency !== 'EUR' ? fxRate : null;
+        h.exchange        = r.exchange || h.exchange || '';
+        h.lastUpdate      = new Date().toISOString();
+        markDirty('holdings', h.id);
+        updated = true;
+      }
+    });
+
+    if(updated) {
+      saveLocal();
+      clearTimeout(syncTimeout);
+      syncTimeout = setTimeout(syncPush, 2000);
+    }
+
+    renderPea();
+  } catch(e) {
+    console.error('refreshPeaPrices error:', e);
+  } finally {
+    if(btn) { btn.innerHTML = '↺ Cotations'; btn.disabled = false; }
+  }
+}
+
+function showFinnhubKeyPrompt(errorMsg) {
+  const old = document.getElementById('finnhub-key-modal');
+  if(old) old.remove();
+  const modal = document.createElement('div');
+  modal.id = 'finnhub-key-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:flex-end';
+  modal.innerHTML = `
+    <div style="background:var(--bg2);border-radius:22px 22px 0 0;width:100%;padding:20px 20px calc(env(safe-area-inset-bottom)+20px);box-sizing:border-box">
+      <div style="font-size:17px;font-weight:700;margin-bottom:6px">🔑 Clé API Finnhub</div>
+      ${errorMsg ? `<div style="font-size:12px;color:var(--red);margin-bottom:10px">⚠ ${errorMsg}</div>` : ''}
+      <div style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6">
+        Pour récupérer les cotations, tu as besoin d'une clé API gratuite Finnhub.<br>
+        1. Va sur <strong style="color:var(--accent2)">finnhub.io</strong> → Sign up (gratuit)<br>
+        2. Copie ta clé depuis le Dashboard<br>
+        3. Colle-la ci-dessous
+      </div>
+      <div class="form-group">
+        <label>Clé API Finnhub</label>
+        <input id="finnhub-key-input" type="text" placeholder="cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          value="${getFinnhubKey()}"
+          style="font-family:'DM Mono',monospace;font-size:13px;letter-spacing:.5px">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:4px">
+        <button onclick="saveFinnhubKey()" class="btn btn-primary" style="flex:1">Enregistrer</button>
+        <button onclick="document.getElementById('finnhub-key-modal').remove()" style="flex:0 0 auto;padding:13px 18px;border-radius:12px;border:none;background:var(--bg3);color:var(--muted);cursor:pointer">Annuler</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.onclick = e => { if(e.target===modal) modal.remove(); };
+  setTimeout(() => document.getElementById('finnhub-key-input')?.focus(), 100);
+}
+
+function saveFinnhubKey() {
+  const key = document.getElementById('finnhub-key-input')?.value.trim();
+  if(!key) return;
+  localStorage.setItem('finnhub_key', key);
+  document.getElementById('finnhub-key-modal')?.remove();
+  renderSettingsFinnhub();
+  // Relancer les cotations
+  refreshPeaPrices();
+}
+
+// ════════════════════════════════════
+//  PEA — RENDU
+// ════════════════════════════════════
+function fmt(n, dec=2) {
+  if(n === null || n === undefined || isNaN(n)) return '—';
+  return n.toLocaleString('fr-FR', { minimumFractionDigits:dec, maximumFractionDigits:dec });
+}
+function fmtEur(n) { return fmt(n) + ' €'; }
+function fmtPct(n) { return (n >= 0 ? '+' : '') + fmt(n, 2) + ' %'; }
+
+function renderPea() {
+  const holdings = db.holdings || [];
+  const listEl   = document.getElementById('pea-holdings-list');
+  if(!listEl) return;
+
+  if(!holdings.length) {
+    listEl.innerHTML = '<div class="empty-state"><span class="emoji">📈</span><p>Aucune position.<br>Ajoutez votre première valeur.</p></div>';
+    document.getElementById('pea-total-cost').textContent  = '—';
+    document.getElementById('pea-total-value').textContent = '—';
+    document.getElementById('pea-total-pnl').textContent   = '—';
+    document.getElementById('pea-total-pct').textContent   = '—';
+    document.getElementById('pea-last-update').textContent = '';
+    return;
+  }
+
+  // Calcul totaux
+  let totalCost = 0, totalValue = 0;
+  let hasPrice = false;
+  holdings.forEach(h => {
+    totalCost += h.quantity * h.avgPrice;
+    if(h.lastPrice) { totalValue += h.quantity * h.lastPrice; hasPrice = true; }
+    else            { totalValue += h.quantity * h.avgPrice; }
+  });
+  const totalPnl = totalValue - totalCost;
+  const totalPct = totalCost > 0 ? (totalPnl / totalCost * 100) : 0;
+
+  // Summary
+  document.getElementById('pea-total-cost').textContent  = fmtEur(totalCost);
+  document.getElementById('pea-total-value').textContent = fmtEur(totalValue);
+  const pnlEl = document.getElementById('pea-total-pnl');
+  pnlEl.textContent = (totalPnl >= 0 ? '+' : '') + fmtEur(totalPnl);
+  pnlEl.className   = 'card-value ' + (totalPnl >= 0 ? 'green' : 'red');
+  const pctEl = document.getElementById('pea-total-pct');
+  pctEl.textContent = fmtPct(totalPct);
+  pctEl.style.color = totalPnl >= 0 ? 'var(--green)' : 'var(--red)';
+
+  // Date dernière mise à jour
+  const lastUpdates = holdings.filter(h=>h.lastUpdate).map(h=>h.lastUpdate).sort().reverse();
+  if(lastUpdates.length) {
+    const d = new Date(lastUpdates[0]);
+    document.getElementById('pea-last-update').textContent =
+      'Cotations : ' + d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'});
+  } else {
+    document.getElementById('pea-last-update').textContent = 'Cotations non chargées — appuyez sur ↺';
+  }
+
+  // Liste des positions
+  listEl.innerHTML = holdings.map(h => {
+    const cost   = h.quantity * h.avgPrice;
+    const value  = h.lastPrice ? h.quantity * h.lastPrice : null;
+    const pnl    = value !== null ? value - cost : null;
+    const pnlPct = cost > 0 && pnl !== null ? (pnl / cost * 100) : null;
+
+    const pnlColor  = pnl === null ? 'var(--muted)' : pnl >= 0 ? 'var(--green)' : 'var(--red)';
+    const chgColor  = !h.lastChange ? 'var(--muted)' : h.lastChange >= 0 ? 'var(--green)' : 'var(--red)';
+
+    const badgeClass = h.assetType === 'crypto' ? 'badge-crypto' : h.assetType === 'etf' ? 'badge-etf' : h.assetType === 'fcp' ? 'badge-fcp' : 'badge-stock';
+    const badgeLabel = h.assetType === 'crypto' ? 'Crypto' : h.assetType === 'etf' ? 'ETF' : h.assetType === 'fcp' ? 'FCP' : 'Action';
+
+    const priceDisplay = h.lastPrice
+      ? `<div class="holding-price">${fmt(h.lastPrice, h.lastPrice < 1 ? 4 : 2)} €</div>
+         <div class="holding-change" style="color:${chgColor}">${h.lastChange !== null ? fmtPct(h.lastChange) + ' aujourd\'hui' : ''}</div>
+         <div style="font-size:10px;color:var(--muted);text-align:right;margin-top:2px">
+           ${h.currency && h.currency !== 'EUR' && h.lastPriceRaw
+             ? `${fmt(h.lastPriceRaw, 2)} ${h.currency} · ×${h.fxRate ? fmt(h.fxRate, 4) : '?'}`
+             : (h.exchange || '')}
+         </div>`
+      : `<div class="holding-price" style="color:var(--muted);font-size:13px">Non chargé</div>`;
+
+    return `
+    <div class="holding-card">
+      <div class="holding-header">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="holding-ticker">${h.ticker}</span>
+            <span class="holding-type-badge ${badgeClass}">${badgeLabel}</span>
+            ${h.currency && h.currency !== 'EUR' && h.lastPrice ? `<span style="font-size:10px;font-weight:700;color:var(--accent2);background:rgba(34,211,238,.1);padding:2px 6px;border-radius:5px">${h.currency}→€</span>` : ''}
+          </div>
+          <div class="holding-name">${h.name}</div>
+        </div>
+        <div>${priceDisplay}</div>
+      </div>
+
+      <div class="holding-grid">
+        <div class="holding-stat">
+          <div class="holding-stat-label">Quantité</div>
+          <div class="holding-stat-value">${fmt(h.quantity, h.quantity % 1 !== 0 ? 4 : 0)}</div>
+        </div>
+        <div class="holding-stat">
+          <div class="holding-stat-label">Px revient</div>
+          <div class="holding-stat-value">${fmt(h.avgPrice, 2)} €</div>
+        </div>
+        <div class="holding-stat">
+          <div class="holding-stat-label">Investi</div>
+          <div class="holding-stat-value">${fmtEur(cost)}</div>
+        </div>
+        <div class="holding-stat">
+          <div class="holding-stat-label">Valorisation</div>
+          <div class="holding-stat-value">${value !== null ? fmtEur(value) : '—'}</div>
+        </div>
+        <div class="holding-stat">
+          <div class="holding-stat-label">+/- value</div>
+          <div class="holding-stat-value" style="color:${pnlColor}">${pnl !== null ? (pnl>=0?'+':'')+fmtEur(pnl) : '—'}</div>
+        </div>
+        <div class="holding-stat">
+          <div class="holding-stat-label">Perf.</div>
+          <div class="holding-stat-value" style="color:${pnlColor}">${pnlPct !== null ? fmtPct(pnlPct) : '—'}</div>
+        </div>
+      </div>
+
+      <div class="holding-actions">
+        <button class="holding-btn" onclick="openEditHolding('${h.id}')">✏️ Modifier</button>
+        <button class="holding-btn danger" onclick="deleteHolding('${h.id}')">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════
+//  PEA — CRUD
+// ════════════════════════════════════
+
+function openAddHolding(prefill) {
+  const old = document.getElementById('holding-modal');
+  if(old) old.remove();
+
+  const h = prefill || {};
+  const modal = document.createElement('div');
+  modal.id = 'holding-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:flex-end';
+  modal.innerHTML = `
+    <div style="background:var(--bg2);border-radius:22px 22px 0 0;width:100%;padding:20px 20px calc(env(safe-area-inset-bottom)+20px);box-sizing:border-box;max-height:90vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <div style="font-size:17px;font-weight:700">${h.id ? 'Modifier la position' : 'Nouvelle position'}</div>
+        <button onclick="document.getElementById('holding-modal').remove()" style="background:var(--bg3);border:none;color:var(--muted);font-size:20px;width:34px;height:34px;border-radius:10px;cursor:pointer">✕</button>
+      </div>
+
+      <div class="form-group">
+        <label>Type d'actif</label>
+        <div style="display:flex;gap:8px">
+          <button type="button" id="htype-stock"  onclick="setHoldingType('stock')"  class="type-btn ${(!h.assetType||h.assetType==='stock')  ? 'active expense' : ''}">📊 Action</button>
+          <button type="button" id="htype-etf"    onclick="setHoldingType('etf')"    class="type-btn ${h.assetType==='etf'    ? 'active income'  : ''}">🧺 ETF</button>
+          <button type="button" id="htype-fcp"    onclick="setHoldingType('fcp')"    class="type-btn ${h.assetType==='fcp'    ? 'active income'  : ''}">📂 FCP</button>
+          <button type="button" id="htype-crypto" onclick="setHoldingType('crypto')" class="type-btn ${h.assetType==='crypto' ? 'active transfer': ''}">₿ Crypto</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Ticker / Code <span id="hticker-hint" style="color:var(--muted);font-size:11px;font-weight:400">(ex: AI.PA pour Air Liquide)</span></label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="h-ticker" type="text" placeholder="AI.PA" value="${h.ticker||''}" style="text-transform:uppercase;flex:1" oninput="this.value=this.value.toUpperCase()">
+          <div style="display:flex;border-radius:10px;overflow:hidden;border:1.5px solid var(--border);flex-shrink:0">
+            <button type="button" id="hcur-eur" onclick="setHoldingCurrency('EUR')"
+              style="padding:8px 12px;border:none;font-size:12px;font-weight:700;cursor:pointer;transition:.15s;background:${(h.quoteCurrency||'EUR')==='EUR'?'var(--accent)':'var(--bg3)'};color:${(h.quoteCurrency||'EUR')==='EUR'?'#fff':'var(--muted)'}">EUR</button>
+            <button type="button" id="hcur-usd" onclick="setHoldingCurrency('USD')"
+              style="padding:8px 12px;border:none;font-size:12px;font-weight:700;cursor:pointer;transition:.15s;background:${(h.quoteCurrency||'EUR')==='USD'?'#f59e0b':'var(--bg3)'};color:${(h.quoteCurrency||'EUR')==='USD'?'#fff':'var(--muted)'}">USD</button>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Nom de la valeur</label>
+        <input id="h-name" type="text" placeholder="Air Liquide" value="${h.name||''}">
+      </div>
+      <div style="display:flex;gap:10px">
+        <div class="form-group" style="flex:1">
+          <label>Quantité</label>
+          <input id="h-qty" type="number" step="0.0001" placeholder="10" value="${h.quantity||''}" inputmode="decimal">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label>Prix de revient unitaire (€)</label>
+          <input id="h-price" type="number" step="0.01" placeholder="150,00" value="${h.avgPrice||''}" inputmode="decimal">
+        </div>
+      </div>
+
+      <div id="h-ticker-help" style="font-size:12px;color:var(--muted);background:var(--bg3);border-radius:10px;padding:10px 12px;margin-bottom:14px;line-height:1.6">
+        💡 <strong>Formats des tickers Finnhub :</strong><br>
+        • Euronext Paris : <code>AI.PA</code>, <code>TTE.PA</code>, <code>CW8.PA</code> → choisir <strong>EUR</strong><br>
+        • NYSE / Nasdaq : <code>AAPL</code>, <code>NVDA</code> → choisir <strong>USD</strong> (converti auto en €)<br>
+        • Crypto (CoinGecko ID) : <code>bitcoin</code>, <code>ethereum</code> → toujours EUR
+      </div>
+
+      <button class="btn btn-primary" style="width:100%" onclick="saveHolding('${h.id||''}')">
+        ${h.id ? 'Enregistrer' : 'Ajouter au portefeuille'}
+      </button>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.onclick = e => { if(e.target===modal) modal.remove(); };
+
+  // Init type et devise de cotation
+  window._currentHoldingType   = h.assetType || 'stock';
+  window._currentQuoteCurrency = h.quoteCurrency || 'EUR';
+  updateHoldingTypeHints();
+}
+
+function setHoldingType(type) {
+  window._currentHoldingType = type;
+  document.getElementById('htype-stock').className  = 'type-btn' + (type==='stock'  ? ' active expense'  : '');
+  document.getElementById('htype-etf').className    = 'type-btn' + (type==='etf'    ? ' active income'   : '');
+  document.getElementById('htype-fcp').className    = 'type-btn' + (type==='fcp'    ? ' active income'   : '');
+  document.getElementById('htype-crypto').className = 'type-btn' + (type==='crypto' ? ' active transfer' : '');
+  // Crypto → toujours EUR
+  if(type === 'crypto') setHoldingCurrency('EUR');
+  updateHoldingTypeHints();
+}
+
+function setHoldingCurrency(cur) {
+  window._currentQuoteCurrency = cur;
+  const btnEur = document.getElementById('hcur-eur');
+  const btnUsd = document.getElementById('hcur-usd');
+  if(!btnEur || !btnUsd) return;
+  btnEur.style.cssText = `padding:8px 12px;border:none;font-size:12px;font-weight:700;cursor:pointer;transition:.15s;background:${cur==='EUR'?'var(--accent)':'var(--bg3)'};color:${cur==='EUR'?'#fff':'var(--muted)'}`;
+  btnUsd.style.cssText = `padding:8px 12px;border:none;font-size:12px;font-weight:700;cursor:pointer;transition:.15s;background:${cur==='USD'?'#f59e0b':'var(--bg3)'};color:${cur==='USD'?'#fff':'var(--muted)'}`;
+}
+
+function updateHoldingTypeHints() {
+  const t = window._currentHoldingType || 'stock';
+  const hint = document.getElementById('hticker-hint');
+  if(!hint) return;
+  if(t === 'stock')  hint.textContent = '(ex: TTE, AI, BNP, MC — sans .PA)';
+  if(t === 'etf')    hint.textContent = '(ex: CW8, EWLD, PAEEM — sans .PA)';
+  if(t === 'fcp')    hint.textContent = '(ex: FR0010149120 — code ISIN ou ticker Bloomberg)';
+  if(t === 'crypto') hint.textContent = '(ex: bitcoin, ethereum, solana)';
+}
+
+function saveHolding(existingId) {
+  const ticker   = document.getElementById('h-ticker').value.trim().toUpperCase();
+  const name     = document.getElementById('h-name').value.trim();
+  const qty      = parseFloat(document.getElementById('h-qty').value.replace(',','.'));
+  const avgPrice = parseFloat(document.getElementById('h-price').value.replace(',','.'));
+  const assetType = window._currentHoldingType || 'stock';
+
+  if(!ticker) { document.getElementById('h-ticker').focus(); return; }
+  if(!name)   { document.getElementById('h-name').focus(); return; }
+  if(!qty || isNaN(qty))      { document.getElementById('h-qty').focus(); return; }
+  if(!avgPrice || isNaN(avgPrice)) { document.getElementById('h-price').focus(); return; }
+
+  if(!db.holdings) db.holdings = [];
+
+  if(existingId) {
+    const h = db.holdings.find(h=>h.id===existingId);
+    if(h) {
+      h.ticker = ticker; h.name = name; h.quantity = qty;
+      h.avgPrice = avgPrice; h.assetType = assetType;
+      h.quoteCurrency = (assetType === 'crypto') ? 'EUR' : (window._currentQuoteCurrency || 'EUR');
+      markDirty('holdings', existingId);
+    }
+  } else {
+    const quoteCurrency = (assetType === 'crypto') ? 'EUR' : (window._currentQuoteCurrency || 'EUR');
+    const newH = {
+      id: 'h_' + Date.now(), ticker, name, assetType,
+      quantity: qty, avgPrice: avgPrice, quoteCurrency,
+      currency: 'EUR', lastPrice: null, lastChange: null, lastUpdate: null
+    };
+    db.holdings.push(newH);
+    markDirty('holdings', newH.id);
+  }
+
+  save();
+  document.getElementById('holding-modal').remove();
+  renderPea();
+}
+
+function openEditHolding(id) {
+  const h = (db.holdings||[]).find(h=>h.id===id);
+  if(!h) return;
+  openAddHolding(h);
+}
+
+function deleteHolding(id) {
+  const h = (db.holdings||[]).find(h=>h.id===id);
+  if(!h) return;
+  confirmDelete(`Supprimer ${h.name} (${h.ticker}) ?`, 'Cette position sera supprimée du portefeuille.', () => {
+    _dirty.deletedHoldings.add(id);
+    db.holdings = db.holdings.filter(h=>h.id!==id);
+    save(); renderPea();
+  });
+}
+
+// Raccourci depuis une position → ouvre la saisie de transaction
+function exportPortfolioCsv() {
+  const holdings = db.holdings || [];
+  if(!holdings.length) { alert('Aucune position à exporter.'); return; }
+
+  const date = new Date().toLocaleDateString('fr-FR').replace(/\//g, '-');
+  const rows = [
+    ['Ticker', 'Nom', 'Type', 'Quantité', 'Px revient (€)', 'Cours (€)', 'Investi (€)', 'Valorisation (€)', '+/- value (€)', 'Perf (%)', 'Dernière cotation']
+  ];
+
+  let totalCost = 0, totalValue = 0;
+
+  holdings.forEach(h => {
+    const cost     = h.quantity * h.avgPrice;
+    const value    = h.lastPrice ? h.quantity * h.lastPrice : null;
+    const pnl      = value !== null ? value - cost : null;
+    const pnlPct   = cost > 0 && pnl !== null ? (pnl / cost * 100) : null;
+    const lastUpd  = h.lastUpdate ? new Date(h.lastUpdate).toLocaleString('fr-FR') : '';
+    const typeLabel = h.assetType === 'crypto' ? 'Crypto' : h.assetType === 'etf' ? 'ETF' : h.assetType === 'fcp' ? 'FCP' : 'Action';
+
+    totalCost  += cost;
+    totalValue += value !== null ? value : cost;
+
+    rows.push([
+      h.ticker,
+      h.name,
+      typeLabel,
+      h.quantity.toString().replace('.', ','),
+      h.avgPrice.toFixed(2).replace('.', ','),
+      h.lastPrice ? h.lastPrice.toFixed(2).replace('.', ',') : '',
+      cost.toFixed(2).replace('.', ','),
+      value !== null ? value.toFixed(2).replace('.', ',') : '',
+      pnl !== null ? pnl.toFixed(2).replace('.', ',') : '',
+      pnlPct !== null ? pnlPct.toFixed(2).replace('.', ',') : '',
+      lastUpd
+    ]);
+  });
+
+  // Ligne totaux
+  const totalPnl = totalValue - totalCost;
+  const totalPct = totalCost > 0 ? (totalPnl / totalCost * 100) : 0;
+  rows.push([]);
+  rows.push([
+    'TOTAL', '', '', '', '',  '',
+    totalCost.toFixed(2).replace('.', ','),
+    totalValue.toFixed(2).replace('.', ','),
+    totalPnl.toFixed(2).replace('.', ','),
+    totalPct.toFixed(2).replace('.', ','),
+    ''
+  ]);
+
+  const csv = rows.map(r => r.map(v => `"${v}"`).join(';')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `PEA_${date}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+
 </script>
 </body>
 </html>
