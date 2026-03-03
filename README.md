@@ -1,4 +1,4 @@
-# AutoThunes — v1.9.3
+# AutoThunes — v1.9.7
 
 Application web de gestion de finances personnelles. Single-file PWA, usage solo, pensée pour mobile.
 
@@ -6,10 +6,10 @@ Application web de gestion de finances personnelles. Single-file PWA, usage solo
 
 ## Architecture
 
-- **Un seul fichier** : `index_15.html` — HTML, CSS et JavaScript embarqués
-- **Base de données** : Supabase (source de vérité)
-- **Cache local** : `localStorage` (navigation offline, résilience réseau)
-- **Stratégie de sync** : dirty-tracking → upsert Supabase à chaque modification, pull complet au chargement
+- Un seul fichier : `index.html` — HTML, CSS et JavaScript embarqués
+- Base de données : Supabase (source de vérité)
+- Cache local : localStorage (navigation offline, résilience réseau)
+- Stratégie de sync : dirty-tracking → upsert Supabase à chaque modification, pull complet au chargement
 
 ---
 
@@ -30,40 +30,12 @@ Répartition des dépenses par catégorie (donut + détail), évolution mensuell
 - **Prêts** : suivi avec tableau d'amortissement (capital restant dû, mensualités, durée)
 - **Thème** : sombre / clair / système
 - **Sauvegarde / Restauration** : export JSON horodaté, import avec confirmation
-- **Clé Finnhub** : saisie et test de la clé API
-
-### 📈 PEA
-Portefeuille boursier avec cotations en temps réel.
-- Actions, ETF, FCP, Crypto
-- Prix de revient, valeur actuelle, plus/moins-value (€ et %)
-- Cotation en **EUR** (Euronext) ou **USD** (NYSE/Nasdaq) — choix par position
-- Conversion USD→EUR automatique via [Frankfurter API](https://www.frankfurter.app)
-- Export CSV du portefeuille
-
----
-
-## APIs externes
-
-| Service | Usage | Clé requise |
-|---|---|---|
-| [Finnhub](https://finnhub.io) | Cotations actions et ETF | ✅ Oui (gratuite) |
-| [CoinGecko](https://coingecko.com) | Cotations crypto | Non |
-| [Frankfurter](https://www.frankfurter.app) | Taux de change EUR/USD | Non |
-
-La clé Finnhub se saisit dans **Paramètres → Clé API Finnhub**. Elle est stockée en `localStorage` uniquement.
-
-### Formats de tickers Finnhub
-- Euronext Paris : `AI.PA`, `TTE.PA`, `CW8.PA` → choisir **EUR** dans le formulaire
-- NYSE / Nasdaq : `AAPL`, `NVDA`, `MSFT` → choisir **USD** (converti automatiquement en €)
-- Crypto (CoinGecko ID) : `bitcoin`, `ethereum`, `solana` → toujours EUR
 
 ---
 
 ## Supabase
 
-**Projet** : `https://nqhcphhxdwqksgxcrafh.supabase.co`
-
-### Tables
+**Projet :** `https://nqhcphhxdwqksgxcrafh.supabase.co`
 
 | Table | Description |
 |---|---|
@@ -74,40 +46,6 @@ La clé Finnhub se saisit dans **Paramètres → Clé API Finnhub**. Elle est st
 | `loans` | Prêts avec paramètres d'amortissement |
 | `categories` | Catégories de dépenses |
 | `labels` | Libellés fréquents (autocomplete) |
-| `holdings` | Positions PEA |
-
-### Schéma `holdings`
-
-```sql
-CREATE TABLE holdings (
-  id             TEXT PRIMARY KEY,
-  ticker         TEXT NOT NULL,
-  name           TEXT,
-  asset_type     TEXT DEFAULT 'stock',
-  quantity       NUMERIC,
-  avg_price      NUMERIC,
-  currency       TEXT DEFAULT 'EUR',
-  quote_currency TEXT NOT NULL DEFAULT 'EUR',  -- EUR ou USD
-  last_price     NUMERIC,
-  last_change    NUMERIC,
-  last_update    TIMESTAMPTZ,
-  exchange       TEXT,
-  created_at     TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
----
-
-## Migrations
-
-### v1.9.3 — Ajout `quote_currency`
-
-```sql
-ALTER TABLE holdings
-  ADD COLUMN IF NOT EXISTS quote_currency TEXT NOT NULL DEFAULT 'EUR';
-```
-
-Fichier fourni : `migration_holdings_quote_currency.sql`
 
 ---
 
@@ -115,13 +53,12 @@ Fichier fourni : `migration_holdings_quote_currency.sql`
 
 L'app est un fichier HTML statique. Aucun serveur nécessaire.
 
-**Options d'hébergement** :
+Options d'hébergement :
 - GitHub Pages
 - Netlify Drop (glisser-déposer)
 - Serveur local (`python3 -m http.server`)
-- Directement depuis le système de fichiers (ouverture via `file://`)
 
-**Installation PWA** (mobile) :
+**Installation PWA (mobile) :**
 - iOS Safari : bouton Partager → "Sur l'écran d'accueil"
 - Android Chrome : bannière automatique ou menu → "Ajouter à l'écran d'accueil"
 
@@ -131,8 +68,12 @@ L'app est un fichier HTML statique. Aucun serveur nécessaire.
 
 | Version | Changement |
 |---|---|
+| 1.9.7 | Tagline OBE sur l'écran de démarrage |
+| 1.9.6 | Masquage onglet PEA et section clé Finnhub dans les paramètres |
+| 1.9.5 | Nettoyage navigation |
+| 1.9.4 | Recherche ticker Finnhub dans le formulaire PEA |
 | 1.9.3 | Toggle EUR/USD par position PEA, persistance `quote_currency` en DB |
-| 1.9.2 | Détection automatique de devise par suffixe de ticker (.PA, .AS…) |
+| 1.9.2 | Détection automatique de devise par suffixe de ticker (`.PA`, `.AS`…) |
 | 1.9.1 | Corrections UX formulaire PEA |
 | 1.9.0 | Module PEA — cotations temps réel, plus/moins-value, export CSV |
 
@@ -140,6 +81,6 @@ L'app est un fichier HTML statique. Aucun serveur nécessaire.
 
 ## Notes
 
-- Application à usage **personnel et solo** — pas de gestion multi-utilisateur
-- Le fichier `localStorage` sert de cache offline ; Supabase reste la source de vérité
-- Les clés Supabase embarquées dans le HTML sont des clés **publishable** (lecture/écriture limitée aux règles RLS)
+- Application à usage personnel et solo — pas de gestion multi-utilisateur
+- Le localStorage sert de cache offline ; Supabase reste la source de vérité
+- Les clés Supabase embarquées dans le HTML sont des clés publishable (lecture/écriture limitée aux règles RLS)
