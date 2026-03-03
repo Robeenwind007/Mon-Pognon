@@ -1,151 +1,145 @@
-# 💰 AutoThunes
+# AutoThunes — v1.9.3
 
-Application de gestion de finances personnelles — PWA single-file, offline-first, synchronisée via Supabase.
-
----
-
-## ✨ Fonctionnalités
-
-- **Multi-comptes** — courant, PEL, LDD, Livret A, PEA, carte…
-- **Transactions** — revenus, dépenses, virements entre comptes
-- **Opérations récurrentes** — prélèvements, revenus, virements mensuels automatiques
-- **Prêts** — suivi d'amortissement avec mensualité + assurance
-- **Statistiques** — graphiques par catégorie et par période
-- **Catégories** — système + custom (emoji + couleur)
-- **Libellés** — autocomplétion intelligente avec fréquence d'utilisation
-- **Thème clair/sombre**
-- **PWA** — installable sur iPhone (Safari) et Android/Chrome
-- **Offline-first** — fonctionne sans connexion, sync automatique dès le retour en ligne
+Application web de gestion de finances personnelles. Single-file PWA, usage solo, pensée pour mobile.
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
-```
-AutoThunes
-├── index.html          ← Application complète (HTML + CSS + JS)
-├── migration.html      ← Outil de migration localStorage → Supabase (usage unique)
-├── schema.sql          ← Script de création des tables Supabase
-├── schema_update.sql   ← Script de mise à jour du schéma (colonnes additionnelles)
-└── README.md
-```
-
-### Stockage des données
-
-| Couche | Rôle |
-|--------|------|
-| **Supabase** | Source de vérité — BDD PostgreSQL cloud |
-| **localStorage** | Cache offline — données disponibles sans connexion |
-| **Mémoire (`db`)** | Cache runtime — toutes les opérations se font en mémoire |
-
-### Flux de synchronisation
-
-- **Au démarrage** : `syncPull()` charge toutes les tables Supabase en parallèle
-- **À chaque modification** : `save()` → localStorage immédiat + `syncPush()` différé 1,5s
-- **`syncPush()`** n'envoie que les entités réellement modifiées (système `_dirty`)
-- **Hors ligne** : l'app fonctionne normalement, le statut affiche "⚠ hors ligne"
+- **Un seul fichier** : `index_15.html` — HTML, CSS et JavaScript embarqués
+- **Base de données** : Supabase (source de vérité)
+- **Cache local** : `localStorage` (navigation offline, résilience réseau)
+- **Stratégie de sync** : dirty-tracking → upsert Supabase à chaque modification, pull complet au chargement
 
 ---
 
-## 🚀 Déploiement
+## Fonctionnalités
 
-### Prérequis
+### 🏦 Tableau de bord
+Soldes de tous les comptes, dernières opérations, prochaines charges récurrentes à venir.
 
-- Un compte [Supabase](https://supabase.com) (gratuit)
-- Un repo GitHub + GitHub Pages activé
+### 💳 Saisie
+Ajout rapide de dépenses, revenus et virements. Sélection du compte, catégorie, libellé (avec autocomplete sur l'historique). Support des opérations à une date passée ou future.
 
-### 1. Créer la base de données
+### 📊 Stats
+Répartition des dépenses par catégorie (donut + détail), évolution mensuelle sur l'année, filtrage par compte. Navigation mois par mois.
 
-Dans **Supabase > SQL Editor**, exécuter dans l'ordre :
+### ⚙️ Paramètres
+- **Comptes** : création, édition, suppression, réordonnancement
+- **Charges récurrentes** : loyer, abonnements, etc. — appliquées automatiquement le 1er du mois
+- **Prêts** : suivi avec tableau d'amortissement (capital restant dû, mensualités, durée)
+- **Thème** : sombre / clair / système
+- **Sauvegarde / Restauration** : export JSON horodaté, import avec confirmation
+- **Clé Finnhub** : saisie et test de la clé API
 
-```sql
--- Étape 1 : créer les tables
--- (contenu de schema.sql)
-
--- Étape 2 : ajouter les colonnes additionnelles
--- (contenu de schema_update.sql)
-```
-
-### 2. Configurer les credentials
-
-Dans `index.html`, modifier les constantes en haut du bloc JavaScript :
-
-```javascript
-const SB_URL = 'https://VOTRE-PROJET.supabase.co';
-const SB_KEY = 'votre-clé-anon-publique';
-```
-
-> Ces valeurs se trouvent dans **Supabase > Settings > API**
-
-### 3. Déployer sur GitHub Pages
-
-```bash
-git add index.html
-git commit -m "deploy"
-git push
-```
-
-Activer GitHub Pages sur la branche `main` dans **Settings > Pages**.
-
-### 4. Installer en PWA sur iPhone
-
-1. Ouvrir l'URL GitHub Pages dans **Safari**
-2. Tap **Partager** → **Sur l'écran d'accueil**
-3. L'app s'installe comme une app native
+### 📈 PEA
+Portefeuille boursier avec cotations en temps réel.
+- Actions, ETF, FCP, Crypto
+- Prix de revient, valeur actuelle, plus/moins-value (€ et %)
+- Cotation en **EUR** (Euronext) ou **USD** (NYSE/Nasdaq) — choix par position
+- Conversion USD→EUR automatique via [Frankfurter API](https://www.frankfurter.app)
+- Export CSV du portefeuille
 
 ---
 
-## 🔄 Migration depuis localStorage
+## APIs externes
 
-Si tu avais des données dans l'ancienne version (localStorage) :
+| Service | Usage | Clé requise |
+|---|---|---|
+| [Finnhub](https://finnhub.io) | Cotations actions et ETF | ✅ Oui (gratuite) |
+| [CoinGecko](https://coingecko.com) | Cotations crypto | Non |
+| [Frankfurter](https://www.frankfurter.app) | Taux de change EUR/USD | Non |
 
-1. Ouvrir `migration.html` dans le **même navigateur** que l'ancienne app
-2. Vérifier le résumé des données détectées
-3. Cliquer **Démarrer la migration**
-4. Une fois terminé, utiliser `index.html` normalement
+La clé Finnhub se saisit dans **Paramètres → Clé API Finnhub**. Elle est stockée en `localStorage` uniquement.
 
-> ⚠️ La migration est non-destructive : le localStorage n'est pas supprimé.
+### Formats de tickers Finnhub
+- Euronext Paris : `AI.PA`, `TTE.PA`, `CW8.PA` → choisir **EUR** dans le formulaire
+- NYSE / Nasdaq : `AAPL`, `NVDA`, `MSFT` → choisir **USD** (converti automatiquement en €)
+- Crypto (CoinGecko ID) : `bitcoin`, `ethereum`, `solana` → toujours EUR
 
 ---
 
-## 📊 Schéma de la base de données
+## Supabase
+
+**Projet** : `https://nqhcphhxdwqksgxcrafh.supabase.co`
+
+### Tables
 
 | Table | Description |
-|-------|-------------|
+|---|---|
 | `accounts` | Comptes bancaires |
-| `transactions` | Toutes les opérations (revenus, dépenses, virements) |
-| `recurring_charges` | Opérations récurrentes mensuelles |
-| `recurring_applied` | Suivi des mois où les récurrentes ont été appliquées |
-| `loans` | Prêts avec amortissement |
-| `categories` | Catégories système + custom |
-| `labels` | Libellés sauvegardés pour l'autocomplétion |
+| `transactions` | Opérations (dépenses, revenus, virements) |
+| `recurring_charges` | Charges récurrentes paramétrées |
+| `recurring_applied` | Historique des applications mensuelles |
+| `loans` | Prêts avec paramètres d'amortissement |
+| `categories` | Catégories de dépenses |
+| `labels` | Libellés fréquents (autocomplete) |
+| `holdings` | Positions PEA |
+
+### Schéma `holdings`
+
+```sql
+CREATE TABLE holdings (
+  id             TEXT PRIMARY KEY,
+  ticker         TEXT NOT NULL,
+  name           TEXT,
+  asset_type     TEXT DEFAULT 'stock',
+  quantity       NUMERIC,
+  avg_price      NUMERIC,
+  currency       TEXT DEFAULT 'EUR',
+  quote_currency TEXT NOT NULL DEFAULT 'EUR',  -- EUR ou USD
+  last_price     NUMERIC,
+  last_change    NUMERIC,
+  last_update    TIMESTAMPTZ,
+  exchange       TEXT,
+  created_at     TIMESTAMPTZ DEFAULT NOW()
+);
+```
 
 ---
 
-## 🔧 Mise à jour de l'app
+## Migrations
 
-### Depuis Mac/PC
+### v1.9.3 — Ajout `quote_currency`
 
-1. Remplacer `index.html` dans le repo
-2. `git push`
+```sql
+ALTER TABLE holdings
+  ADD COLUMN IF NOT EXISTS quote_currency TEXT NOT NULL DEFAULT 'EUR';
+```
 
-### Sur iPhone
-
-1. Fermer la PWA complètement (swipe up)
-2. Rouvrir — elle rechargera automatiquement la nouvelle version
-
-> Pas de service worker, la mise à jour est immédiate.
+Fichier fourni : `migration_holdings_quote_currency.sql`
 
 ---
 
-## 📝 Changelog
+## Déploiement
 
-### v1.8.7 — Migration Supabase (tables normalisées)
-- Remplacement du système de sync blob (`sync_data`) par des tables normalisées
-- Chaque entité (compte, transaction, récurrente…) est stockée dans sa propre table
-- Sync différentiel : seules les entités modifiées sont envoyées à Supabase
-- Ajout des colonnes : `accounts.sort_order`, `recurring_charges.active`, `start_month_key`, `pointed`
+L'app est un fichier HTML statique. Aucun serveur nécessaire.
 
-### v1.8.6 et antérieures
-- Gestion multi-comptes, prêts, récurrentes, stats, catégories custom
-- PWA offline-first avec sync Supabase (ancien système blob)
+**Options d'hébergement** :
+- GitHub Pages
+- Netlify Drop (glisser-déposer)
+- Serveur local (`python3 -m http.server`)
+- Directement depuis le système de fichiers (ouverture via `file://`)
+
+**Installation PWA** (mobile) :
+- iOS Safari : bouton Partager → "Sur l'écran d'accueil"
+- Android Chrome : bannière automatique ou menu → "Ajouter à l'écran d'accueil"
+
+---
+
+## Versioning
+
+| Version | Changement |
+|---|---|
+| 1.9.3 | Toggle EUR/USD par position PEA, persistance `quote_currency` en DB |
+| 1.9.2 | Détection automatique de devise par suffixe de ticker (.PA, .AS…) |
+| 1.9.1 | Corrections UX formulaire PEA |
+| 1.9.0 | Module PEA — cotations temps réel, plus/moins-value, export CSV |
+
+---
+
+## Notes
+
+- Application à usage **personnel et solo** — pas de gestion multi-utilisateur
+- Le fichier `localStorage` sert de cache offline ; Supabase reste la source de vérité
+- Les clés Supabase embarquées dans le HTML sont des clés **publishable** (lecture/écriture limitée aux règles RLS)
