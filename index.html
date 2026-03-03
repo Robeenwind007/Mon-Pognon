@@ -1085,7 +1085,9 @@ function addAccount() {
   const balance = parseFloat(document.getElementById('acc-balance').value)||0;
   if(!name) { document.getElementById('acc-name').focus(); return; }
   const icon = ACCOUNT_TYPES[type]?.icon || selectedIcon;
-  db.accounts.push({ id: Date.now().toString(), name, icon, type, initialBalance: balance, includeInTotal: true });
+  const newAcc = { id: Date.now().toString(), name, icon, type, initialBalance: balance, includeInTotal: true };
+  db.accounts.push(newAcc);
+  markDirty('accounts', newAcc.id);
   save(); populateSelects(); renderDashboard(); renderAccountsManage(); closeSheet('account-sheet');
   document.getElementById('acc-name').value='';
   document.getElementById('acc-balance').value='';
@@ -1093,10 +1095,24 @@ function addAccount() {
   showPage('dashboard', document.querySelector('.nav-item'));
 }
 
+function confirmDelete(title, subtitle, onConfirm) {
+  const modal = document.getElementById('confirm-modal');
+  document.getElementById('confirm-modal-text').textContent = title;
+  document.getElementById('confirm-modal-sub').textContent = subtitle;
+  modal.style.display = 'flex';
+  const btnOk     = document.getElementById('confirm-modal-ok');
+  const btnCancel = document.getElementById('confirm-modal-cancel');
+  const close = () => { modal.style.display = 'none'; btnOk.onclick = null; btnCancel.onclick = null; };
+  btnOk.onclick     = () => { close(); onConfirm(); };
+  btnCancel.onclick = () => close();
+}
+
 function deleteAccount(id) {
   const a = db.accounts.find(a=>a.id===id);
   if(!a) return;
   confirmDelete('Supprimer ce compte ?', `"${a.name}" et toutes ses opérations seront supprimés.`, () => {
+    _dirty.deletedAccounts.add(id);
+    // Les transactions et récurrentes seront supprimées en cascade par Supabase (ON DELETE CASCADE)
     db.accounts = db.accounts.filter(a=>a.id!==id);
     db.transactions = db.transactions.filter(t=>t.accountId!==id);
     db.recurringCharges = db.recurringCharges.filter(r=>r.accountId!==id);
@@ -1175,44 +1191,43 @@ function applyRecurringIfNeeded() {
   const todayDay = now.getDate();
 
   db.recurringCharges.forEach(r=>{
-    if(r.active === false) return; // désactivée
-    if(r.day > todayDay) return; // pas encore le jour J
+    if(r.active === false) return;
+    if(r.day > todayDay) return;
 
-    // Clé unique pour ce mois : on la stocke dans applied[]
     const monthKey = `${yr}-${mo}`;
     if(!r.applied) r.applied = [];
-    if(r.applied.includes(monthKey)) return; // déjà fait ce mois
+    if(r.applied.includes(monthKey)) return;
 
     const dateStr = `${yr}-${mo}-${String(r.day).padStart(2,'0')}`;
 
     if(r.type === 'transfer' && r.toAccountId) {
       const transferId = `rec-${r.id}-${monthKey}`;
-      db.transactions.push({
-        id: transferId+'_out', label: r.label+' (récurrent)', amount: r.amount,
+      const txOut = { id: transferId+'_out', label: r.label+' (récurrent)', amount: r.amount,
         accountId: r.accountId, category:'savings', date: dateStr,
-        type:'expense', isTransfer:true, transferId, transferTo: r.toAccountId, isRecurring:true
-      });
-      db.transactions.push({
-        id: transferId+'_in', label: r.label+' (récurrent)', amount: r.amount,
+        type:'expense', isTransfer:true, transferId, transferTo: r.toAccountId, isRecurring:true };
+      const txIn  = { id: transferId+'_in',  label: r.label+' (récurrent)', amount: r.amount,
         accountId: r.toAccountId, category:'savings', date: dateStr,
-        type:'income', isTransfer:true, transferId, transferFrom: r.accountId, isRecurring:true
-      });
+        type:'income', isTransfer:true, transferId, transferFrom: r.accountId, isRecurring:true };
+      db.transactions.push(txOut);
+      db.transactions.push(txIn);
+      markDirty('transactions', txOut.id);
+      markDirty('transactions', txIn.id);
     } else if(r.type === 'income') {
-      db.transactions.push({
-        id: `rec-${r.id}-${monthKey}`,
-        label: r.label+' (récurrent)', amount: r.amount,
+      const tx = { id: `rec-${r.id}-${monthKey}`, label: r.label+' (récurrent)', amount: r.amount,
         accountId: r.accountId, category: r.category||'salary', date: dateStr,
-        type:'income', isRecurring:true
-      });
+        type:'income', isRecurring:true };
+      db.transactions.push(tx);
+      markDirty('transactions', tx.id);
     } else {
-      db.transactions.push({
-        id: `rec-${r.id}-${monthKey}`,
-        label: r.label+' (récurrent)', amount: r.amount,
+      const tx = { id: `rec-${r.id}-${monthKey}`, label: r.label+' (récurrent)', amount: r.amount,
         accountId: r.accountId, category: r.category||'other', date: dateStr,
-        type:'expense', isRecurring:true
-      });
+        type:'expense', isRecurring:true };
+      db.transactions.push(tx);
+      markDirty('transactions', tx.id);
     }
     r.applied.push(monthKey);
+    markDirty('recurring', r.id);
+    _dirty.newApplied.push({ recurring_charge_id: r.id, month_key: monthKey });
   });
   save();
 }
@@ -1343,6 +1358,7 @@ function saveEditAccount(id) {
   a.type           = document.getElementById('edit-acc-type').value;
   a.icon           = window._editAccIcon || ACCOUNT_TYPES[a.type]?.icon || '🏦';
   a.initialBalance = parseFloat(document.getElementById('edit-acc-balance').value)||0;
+  markDirty('accounts', a.id);
   save();
   document.getElementById('edit-account-modal').remove();
   renderAccountsManage(); renderDashboard(); populateSelects();
@@ -1352,6 +1368,7 @@ function toggleAccountInclude(id) {
   const a = db.accounts.find(a=>a.id===id);
   if(!a) return;
   a.includeInTotal = (a.includeInTotal === false) ? true : false;
+  markDirty('accounts', a.id);
   save(); refreshAll();
 }
 
@@ -1363,6 +1380,8 @@ function moveAccount(id, dir) {
   const tmp = db.accounts[idx];
   db.accounts[idx] = db.accounts[newIdx];
   db.accounts[newIdx] = tmp;
+  // Marquer tous les comptes dirty car sort_order change pour tous
+  db.accounts.forEach(a => markDirty('accounts', a.id));
   save(); refreshAll();
 }
 
@@ -1373,6 +1392,7 @@ function togglePointed(id) {
   const monthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   if(!r.pointed) r.pointed = {};
   r.pointed[monthKey] = !r.pointed[monthKey];
+  markDirty('recurring', r.id);
   save(); renderDashboard();
 }
 
@@ -1445,6 +1465,7 @@ function saveNewLabel(ctx) {
     const category = catSel ? catSel.value : '';
     labels.push({ text, category, uses:0 });
     db.labels = labels;
+    markDirty('labels', text);
     save();
   }
   document.getElementById(ctx+'-label-save').classList.remove('visible');
@@ -1457,7 +1478,13 @@ function saveNewLabel(ctx) {
 
 function deleteLabel(text, ctx) {
   db.labels = getLabels().filter(l=>l.text!==text);
-  save();
+  // Pour les labels, on fait un push complet (pas de delete individuel par id)
+  db.labels.forEach(l => markDirty('labels', l.text));
+  // Supprimer en BDD via une requête directe (text = unique key)
+  fetch(`${SB_URL}/rest/v1/labels?text=eq.${encodeURIComponent(text)}`, {
+    method: 'DELETE', headers: sbHeaders()
+  }).catch(e => console.warn('deleteLabel SB:', e));
+  saveLocal();
   filterLabels(ctx);
 }
 
@@ -1466,9 +1493,11 @@ function incrementLabelUse(text, category) {
   const existing = labels.find(l=>l.text.toLowerCase()===text.toLowerCase());
   if(existing) {
     existing.uses = (existing.uses||0)+1;
-    existing.category = category; // met à jour la catégorie associée
+    existing.category = category;
+    markDirty('labels', existing.text);
   } else {
     labels.push({ text, category, uses:1 });
+    markDirty('labels', text);
   }
   db.labels = labels;
 }
@@ -1545,24 +1574,21 @@ function addTransactionSheet() {
 function pushTransaction(tx) {
   tx.id = Date.now().toString();
   db.transactions.unshift(tx);
+  markDirty('transactions', tx.id);
   incrementLabelUse(tx.label, tx.category);
   save(); requestAnimationFrame(() => refreshAll());
 }
 
 function pushTransfer({label, amount, fromAccountId, toAccountId, date}) {
   const transferId = Date.now().toString();
-  db.transactions.unshift({
-    id: transferId + '_out',
-    label, amount, accountId: fromAccountId,
-    category: 'savings', date,
-    type: 'expense', isTransfer: true, transferId, transferTo: toAccountId
-  });
-  db.transactions.unshift({
-    id: transferId + '_in',
-    label, amount, accountId: toAccountId,
-    category: 'savings', date,
-    type: 'income', isTransfer: true, transferId, transferFrom: fromAccountId
-  });
+  const txOut = { id: transferId + '_out', label, amount, accountId: fromAccountId,
+    category: 'savings', date, type: 'expense', isTransfer: true, transferId, transferTo: toAccountId };
+  const txIn  = { id: transferId + '_in',  label, amount, accountId: toAccountId,
+    category: 'savings', date, type: 'income',  isTransfer: true, transferId, transferFrom: fromAccountId };
+  db.transactions.unshift(txOut);
+  db.transactions.unshift(txIn);
+  markDirty('transactions', txOut.id);
+  markDirty('transactions', txIn.id);
   incrementLabelUse(label, 'savings');
   save(); requestAnimationFrame(() => refreshAll());
 }
@@ -1639,6 +1665,11 @@ function saveEditTransaction(id) {
   }
 
   document.getElementById('edit-tx-modal').remove();
+  markDirty('transactions', id);
+  if(t.isTransfer && t.transferId) {
+    const partner2 = db.transactions.find(x=>x.transferId===t.transferId && x.id!==id);
+    if(partner2) markDirty('transactions', partner2.id);
+  }
   save();
   requestAnimationFrame(() => refreshAll());
 }
@@ -1648,11 +1679,14 @@ function deleteTransaction(id) {
   if(!tx) return;
   if(tx.isTransfer && tx.transferId) {
     confirmDelete('Supprimer ce virement ?', 'Les deux mouvements (débit et crédit) seront supprimés.', () => {
+      const toDelete = db.transactions.filter(t=>t.transferId===tx.transferId).map(t=>t.id);
+      toDelete.forEach(id => _dirty.deletedTx.add(id));
       db.transactions = db.transactions.filter(t=>t.transferId!==tx.transferId);
       save(); requestAnimationFrame(() => refreshAll());
     });
   } else {
     confirmDelete('Supprimer cette opération ?', `"${tx.label}" — ${tx.amount} €`, () => {
+      _dirty.deletedTx.add(id);
       db.transactions = db.transactions.filter(t=>t.id!==id);
       save(); requestAnimationFrame(() => refreshAll());
     });
@@ -1679,11 +1713,13 @@ function addRecurring() {
     document.getElementById('rec-account-to')?.focus(); return;
   }
 
-  db.recurringCharges.push({
+  const newRec = {
     id: Date.now().toString(), label, amount, accountId, category, day,
     type: currentRecType, active: true,
     ...(isTransfer ? { toAccountId } : {})
-  });
+  };
+  db.recurringCharges.push(newRec);
+  markDirty('recurring', newRec.id);
   save(); refreshAll(); closeSheet('recurring-sheet');
   document.getElementById('rec-label').value='';
   document.getElementById('rec-amount').value='';
@@ -1695,6 +1731,7 @@ function deleteRecurring(id) {
   const r = db.recurringCharges.find(r=>r.id===id);
   if(!r) return;
   confirmDelete('Supprimer cette récurrente ?', `"${r.label}" — ${r.amount} €`, () => {
+    _dirty.deletedRec.add(id);
     db.recurringCharges = db.recurringCharges.filter(r=>r.id!==id);
     save(); refreshAll();
   });
@@ -1704,6 +1741,7 @@ function toggleRecurring(id) {
   const r = db.recurringCharges.find(r=>r.id===id);
   if(!r) return;
   r.active = (r.active === false) ? true : false;
+  markDirty('recurring', r.id);
   save(); refreshAll();
 }
 
@@ -1809,6 +1847,7 @@ function saveEditRecurring(id) {
   }
 
   save();
+  markDirty('recurring', r.id);
   document.getElementById('edit-rec-modal').remove();
   renderRecurring(); renderDashboard();
 }
@@ -2838,6 +2877,7 @@ function addCategory() {
   // Générer un id unique à partir du label
   const id = 'cat_' + Date.now();
   db.categories.push({ id, label, icon, color, system: false });
+  markDirty('categories', id);
   save();
   populateSelects(); // mettre à jour les selects de catégorie partout
   renderSettings();
@@ -2851,6 +2891,7 @@ function deleteCategory(id) {
              + db.recurringCharges.filter(r=>r.category===id).length;
   if(uses > 0) { return; }
   confirmDelete(`Supprimer la catégorie "${cat.label}" ?`, 'Cette action est irréversible.', () => {
+    _dirty.deletedCategories.add(id);
     db.categories = db.categories.filter(c=>c.id!==id);
     save(); populateSelects(); renderSettings();
   });
@@ -2899,15 +2940,13 @@ function saveLoan() {
 
   const id = 'loan_' + Date.now();
   db.loans.push({ id, label, accountId, start, firstPayment, day, amount, duration, monthly, insurance });
+  markDirty('loans', id);
 
-  // Calcul de la date de début effective de la récurrente
-  // Si firstPayment est dans le futur, on note le mois de démarrage
   const totalMonthly = monthly + insurance;
   const fp = firstPayment ? new Date(firstPayment) : new Date(start);
   const fpMonthKey = `${fp.getFullYear()}-${String(fp.getMonth()+1).padStart(2,'0')}`;
 
-  // Une seule récurrente = mensualité + assurance
-  db.recurringCharges.push({
+  const newRec = {
     id: 'rec_' + id,
     label: `${label}${insurance > 0 ? ` (dont ass. ${insurance.toFixed(2).replace('.',',')} €)` : ''}`,
     amount: totalMonthly,
@@ -2916,7 +2955,9 @@ function saveLoan() {
     loanId: id,
     startMonthKey: fpMonthKey,
     applied: []
-  });
+  };
+  db.recurringCharges.push(newRec);
+  markDirty('recurring', newRec.id);
 
   save();
   closeLoanForm();
@@ -3002,17 +3043,16 @@ function saveEditLoan(id) {
   if(!duration||isNaN(duration)) { document.getElementById('eloan-duration').focus(); return; }
   if(!monthly||isNaN(monthly))   { document.getElementById('eloan-monthly').focus(); return; }
 
-  // Mettre à jour le prêt
   Object.assign(loan, { label, accountId, start, firstPayment, day, amount, duration, monthly, insurance });
+  markDirty('loans', id);
 
   const totalMonthly = monthly + insurance;
   const fp = firstPayment ? new Date(firstPayment) : new Date(start);
   const fpMonthKey = `${fp.getFullYear()}-${String(fp.getMonth()+1).padStart(2,'0')}`;
   const recLabel = `${label}${insurance > 0 ? ` (dont ass. ${insurance.toFixed(2).replace('.',',')} €)` : ''}`;
 
-  // Supprimer toutes les anciennes récurrentes du prêt et en créer une nouvelle unique
   db.recurringCharges = db.recurringCharges.filter(r => r.loanId !== id);
-  db.recurringCharges.push({
+  const newRec2 = {
     id: 'rec_' + id,
     label: recLabel,
     amount: totalMonthly,
@@ -3021,7 +3061,9 @@ function saveEditLoan(id) {
     loanId: id,
     startMonthKey: fpMonthKey,
     applied: []
-  });
+  };
+  db.recurringCharges.push(newRec2);
+  markDirty('recurring', newRec2.id);
 
   save();
   document.getElementById('edit-loan-modal').remove();
@@ -3032,6 +3074,9 @@ function deleteLoan(id) {
   const loan = (db.loans||[]).find(l=>l.id===id);
   if(!loan) return;
   confirmDelete(`Supprimer le prêt "${loan.label}" ?`, 'Les récurrentes associées seront aussi supprimées.', () => {
+    _dirty.deletedLoans.add(id);
+    // Les récurrentes liées au prêt
+    db.recurringCharges.filter(r=>r.loanId===id).forEach(r=>_dirty.deletedRec.add(r.id));
     db.loans = (db.loans||[]).filter(l=>l.id!==id);
     db.recurringCharges = db.recurringCharges.filter(r=>r.loanId!==id);
     save(); refreshAll();
@@ -3139,20 +3184,20 @@ async function forceSync() {
 }
 
 // ════════════════════════════════════
-//  SUPABASE SYNC
+//  SUPABASE — CONFIG & HELPERS
 // ════════════════════════════════════
-const SB_URL     = 'https://nqhcphhxdwqksgxcrafh.supabase.co';
-const SB_KEY     = 'sb_publishable_fvlEQ8tNlXSj7J15gqf-fQ_MK0900fm';
-const SB_USER_KEY = 'monpognon_user';
+const SB_URL = 'https://nqhcphhxdwqksgxcrafh.supabase.co';
+const SB_KEY = 'sb_publishable_fvlEQ8tNlXSj7J15gqf-fQ_MK0900fm';
 
-let syncTimeout  = null;
-let syncBusy     = false; // verrou global : interdit push et pull simultanés
+let syncTimeout = null;
+let syncBusy    = false;
 
-function sbHeaders() {
+function sbHeaders(extra) {
   return {
     'Content-Type': 'application/json',
     'apikey': SB_KEY,
-    'Authorization': `Bearer ${SB_KEY}`
+    'Authorization': `Bearer ${SB_KEY}`,
+    ...(extra || {})
   };
 }
 
@@ -3163,7 +3208,200 @@ function setSyncStatus(msg, color) {
   el.style.color = color || 'var(--muted)';
 }
 
-// save() : sauvegarde locale + push Supabase différé
+// Upsert générique (insert or update)
+async function sbUpsert(table, rows) {
+  if(!rows || rows.length === 0) return;
+  const res = await fetch(`${SB_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: sbHeaders({ 'Prefer': 'resolution=merge-duplicates' }),
+    body: JSON.stringify(rows)
+  });
+  if(!res.ok) {
+    const err = await res.text();
+    throw new Error(`upsert ${table}: ${res.status} — ${err}`);
+  }
+}
+
+// Delete par id (colonne `id`)
+async function sbDelete(table, ids) {
+  if(!ids || ids.length === 0) return;
+  const list = ids.map(id => `"${id}"`).join(',');
+  const res = await fetch(`${SB_URL}/rest/v1/${table}?id=in.(${list})`, {
+    method: 'DELETE',
+    headers: sbHeaders()
+  });
+  if(!res.ok) {
+    const err = await res.text();
+    throw new Error(`delete ${table}: ${res.status} — ${err}`);
+  }
+}
+
+// Select tous les enregistrements d'une table
+async function sbSelect(table, params) {
+  const qs = params ? '?' + params : '';
+  const res = await fetch(`${SB_URL}/rest/v1/${table}${qs}`, {
+    headers: sbHeaders()
+  });
+  if(!res.ok) throw new Error(`select ${table}: ${res.status}`);
+  return res.json();
+}
+
+// ════════════════════════════════════
+//  CONVERSION db <-> Supabase rows
+// ════════════════════════════════════
+
+function accountToRow(a) {
+  return {
+    id:               a.id,
+    name:             a.name,
+    icon:             a.icon || '🏦',
+    type:             a.type || 'courant',
+    initial_balance:  parseFloat(a.initialBalance) || 0,
+    include_in_total: a.includeInTotal !== false,
+    sort_order:       a._sortOrder || 0
+  };
+}
+function rowToAccount(r) {
+  return {
+    id:             r.id,
+    name:           r.name,
+    icon:           r.icon,
+    type:           r.type,
+    initialBalance: parseFloat(r.initial_balance) || 0,
+    includeInTotal: r.include_in_total !== false,
+    _sortOrder:     r.sort_order || 0
+  };
+}
+
+function transactionToRow(t) {
+  return {
+    id:           t.id,
+    account_id:   t.accountId,
+    label:        t.label || '',
+    amount:       parseFloat(t.amount) || 0,
+    date:         t.date,
+    type:         t.type || 'expense',
+    category:     t.category || null,
+    is_transfer:  t.isTransfer || false,
+    transfer_id:  t.transferId || null,
+    transfer_from:t.transferFrom || null,
+    transfer_to:  t.transferTo || null,
+    is_recurring: t.isRecurring || false,
+    recurring_id: t.recurringId || null
+  };
+}
+function rowToTransaction(r) {
+  return {
+    id:          r.id,
+    accountId:   r.account_id,
+    label:       r.label,
+    amount:      parseFloat(r.amount),
+    date:        r.date,
+    type:        r.type,
+    category:    r.category,
+    isTransfer:  r.is_transfer,
+    transferId:  r.transfer_id,
+    transferFrom:r.transfer_from,
+    transferTo:  r.transfer_to,
+    isRecurring: r.is_recurring,
+    recurringId: r.recurring_id
+  };
+}
+
+function recurringToRow(r) {
+  return {
+    id:              r.id,
+    account_id:      r.accountId,
+    to_account_id:   r.toAccountId || null,
+    label:           r.label || '',
+    amount:          parseFloat(r.amount) || 0,
+    day:             parseInt(r.day) || 1,
+    type:            r.type || 'expense',
+    category:        r.category || null,
+    is_loan_payment: r.isLoanPayment || false,
+    loan_id:         r.loanId || null,
+    active:          r.active !== false,
+    start_month_key: r.startMonthKey || null,
+    pointed:         r.pointed ? JSON.stringify(r.pointed) : null
+  };
+}
+function rowToRecurring(r) {
+  return {
+    id:            r.id,
+    accountId:     r.account_id,
+    toAccountId:   r.to_account_id,
+    label:         r.label,
+    amount:        parseFloat(r.amount),
+    day:           r.day,
+    type:          r.type,
+    category:      r.category,
+    isLoanPayment: r.is_loan_payment,
+    loanId:        r.loan_id,
+    active:        r.active !== false,
+    startMonthKey: r.start_month_key,
+    pointed:       r.pointed ? (typeof r.pointed === 'string' ? JSON.parse(r.pointed) : r.pointed) : {},
+    applied:       [] // sera rempli depuis recurring_applied
+  };
+}
+
+function loanToRow(l) {
+  return {
+    id:            l.id,
+    account_id:    l.accountId,
+    label:         l.label || '',
+    start_date:    l.start,
+    first_payment: l.firstPayment || l.start,
+    day:           parseInt(l.day) || 1,
+    amount:        parseFloat(l.amount) || 0,
+    duration:      parseInt(l.duration) || 0,
+    monthly:       parseFloat(l.monthly) || 0,
+    insurance:     parseFloat(l.insurance) || 0
+  };
+}
+function rowToLoan(r) {
+  return {
+    id:           r.id,
+    accountId:    r.account_id,
+    label:        r.label,
+    start:        r.start_date,
+    firstPayment: r.first_payment,
+    day:          r.day,
+    amount:       parseFloat(r.amount),
+    duration:     r.duration,
+    monthly:      parseFloat(r.monthly),
+    insurance:    parseFloat(r.insurance) || 0
+  };
+}
+
+function categoryToRow(c) {
+  return { id: c.id, label: c.label, icon: c.icon, color: c.color, system: c.system || false };
+}
+function rowToCategory(r) {
+  return { id: r.id, label: r.label, icon: r.icon, color: r.color, system: r.system || false };
+}
+
+function labelToRow(l) {
+  return { text: l.text, category: l.category || null, uses: parseInt(l.uses) || 0 };
+}
+function rowToLabel(r) {
+  return { text: r.text, category: r.category, uses: r.uses || 0 };
+}
+
+// ════════════════════════════════════
+//  SAVE — locale + push différé
+// ════════════════════════════════════
+
+// Suivi des entités modifiées depuis le dernier push
+let _dirty = { accounts: new Set(), transactions: new Set(), recurring: new Set(),
+               loans: new Set(), categories: new Set(), labels: new Set(),
+               deletedTx: new Set(), deletedRec: new Set(), deletedAccounts: new Set(),
+               deletedLoans: new Set(), deletedCategories: new Set(),
+               newApplied: [] };
+
+function markDirty(type, id) {
+  if(_dirty[type]) _dirty[type].add(id);
+}
+
 function save() {
   saveLocal();
   clearTimeout(syncTimeout);
@@ -3175,48 +3413,140 @@ async function syncPush() {
   syncBusy = true;
   try {
     setSyncStatus('↑ sync…', 'var(--muted)');
-    const res = await fetch(`${SB_URL}/rest/v1/sync_data`, {
-      method: 'POST',
-      headers: { ...sbHeaders(), 'Prefer': 'resolution=merge-duplicates' },
-      body: JSON.stringify({
-        user_key: SB_USER_KEY,
-        data: db,
-        updated_at: new Date().toISOString()
-      })
-    });
-    setSyncStatus(res.ok ? '✓ synchronisé' : '⚠ erreur sync', res.ok ? 'var(--green)' : 'var(--orange)');
+
+    // Comptes
+    if(_dirty.accounts.size > 0) {
+      const rows = db.accounts
+        .filter(a => _dirty.accounts.has(a.id))
+        .map((a, i) => ({ ...accountToRow(a), sort_order: db.accounts.indexOf(a) }));
+      await sbUpsert('accounts', rows);
+    }
+    if(_dirty.deletedAccounts.size > 0) {
+      await sbDelete('accounts', [..._dirty.deletedAccounts]);
+    }
+
+    // Transactions
+    if(_dirty.transactions.size > 0) {
+      const rows = db.transactions
+        .filter(t => _dirty.transactions.has(t.id))
+        .map(transactionToRow);
+      await sbUpsert('transactions', rows);
+    }
+    if(_dirty.deletedTx.size > 0) {
+      await sbDelete('transactions', [..._dirty.deletedTx]);
+    }
+
+    // Récurrentes
+    if(_dirty.recurring.size > 0) {
+      const rows = db.recurringCharges
+        .filter(r => _dirty.recurring.has(r.id))
+        .map(recurringToRow);
+      await sbUpsert('recurring_charges', rows);
+    }
+    if(_dirty.deletedRec.size > 0) {
+      await sbDelete('recurring_charges', [..._dirty.deletedRec]);
+    }
+
+    // Mois appliqués (nouveaux seulement — jamais supprimés individuellement)
+    if(_dirty.newApplied.length > 0) {
+      await sbUpsert('recurring_applied', _dirty.newApplied);
+    }
+
+    // Prêts
+    if(_dirty.loans.size > 0) {
+      const rows = (db.loans || [])
+        .filter(l => _dirty.loans.has(l.id))
+        .map(loanToRow);
+      await sbUpsert('loans', rows);
+    }
+    if(_dirty.deletedLoans.size > 0) {
+      await sbDelete('loans', [..._dirty.deletedLoans]);
+    }
+
+    // Catégories custom
+    if(_dirty.categories.size > 0) {
+      const rows = db.categories
+        .filter(c => !c.system && _dirty.categories.has(c.id))
+        .map(categoryToRow);
+      if(rows.length) await sbUpsert('categories', rows);
+    }
+    if(_dirty.deletedCategories.size > 0) {
+      await sbDelete('categories', [..._dirty.deletedCategories]);
+    }
+
+    // Labels
+    if(_dirty.labels.size > 0) {
+      const rows = (db.labels || [])
+        .filter(l => _dirty.labels.has(l.text))
+        .map(labelToRow);
+      if(rows.length) await sbUpsert('labels', rows);
+    }
+
+    // Reset dirty
+    _dirty = { accounts: new Set(), transactions: new Set(), recurring: new Set(),
+               loans: new Set(), categories: new Set(), labels: new Set(),
+               deletedTx: new Set(), deletedRec: new Set(), deletedAccounts: new Set(),
+               deletedLoans: new Set(), deletedCategories: new Set(),
+               newApplied: [] };
+
+    setSyncStatus('✓ synchronisé', 'var(--green)');
   } catch(e) {
-    setSyncStatus('⚠ hors ligne', 'var(--orange)');
+    console.error('syncPush error:', e);
+    setSyncStatus('⚠ erreur sync', 'var(--orange)');
   } finally {
     syncBusy = false;
   }
 }
 
+// ════════════════════════════════════
+//  PULL — chargement initial depuis Supabase
+// ════════════════════════════════════
 async function syncPull() {
   if(syncBusy) return false;
   syncBusy = true;
   try {
     setSyncStatus('↓ chargement…', 'var(--muted)');
-    const res = await fetch(
-      `${SB_URL}/rest/v1/sync_data?user_key=eq.${SB_USER_KEY}&select=data,updated_at`,
-      { headers: sbHeaders() }
-    );
-    if(!res.ok) { setSyncStatus('⚠ erreur sync', 'var(--orange)'); return false; }
-    const rows = await res.json();
-    if(rows.length && rows[0].data) {
-      db = rows[0].data;
-      if(!db.categories)       db.categories       = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
-      if(!db.loans)            db.loans            = [];
-      if(!db.recurringCharges) db.recurringCharges = [];
-      if(!db.transactions)     db.transactions     = [];
-      if(!db.accounts)         db.accounts         = [];
-      saveLocal(); // persiste localement SANS déclencher un push
-      setSyncStatus('✓ synchronisé', 'var(--green)');
-      return true;
-    }
-    setSyncStatus('✓ prêt', 'var(--green)');
-    return false;
+
+    // Chargement parallèle de toutes les tables
+    const [
+      accRows, txRows, recRows, appliedRows,
+      loanRows, catRows, labelRows
+    ] = await Promise.all([
+      sbSelect('accounts', 'order=sort_order.asc,created_at.asc'),
+      sbSelect('transactions', 'order=date.desc,created_at.desc'),
+      sbSelect('recurring_charges', 'order=created_at.asc'),
+      sbSelect('recurring_applied'),
+      sbSelect('loans', 'order=created_at.asc'),
+      sbSelect('categories', 'order=created_at.asc'),
+      sbSelect('labels', 'order=uses.desc')
+    ]);
+
+    // Construire la map applied par recurring_id
+    const appliedMap = {};
+    appliedRows.forEach(r => {
+      if(!appliedMap[r.recurring_charge_id]) appliedMap[r.recurring_charge_id] = [];
+      appliedMap[r.recurring_charge_id].push(r.month_key);
+    });
+
+    // Remplir db
+    db.accounts         = accRows.map(rowToAccount);
+    db.transactions     = txRows.map(rowToTransaction);
+    db.recurringCharges = recRows.map(r => {
+      const rec = rowToRecurring(r);
+      rec.applied = appliedMap[r.id] || [];
+      return rec;
+    });
+    db.loans      = loanRows.map(rowToLoan);
+    // Catégories : fusionner système (local) + custom (Supabase)
+    const customCats = catRows.filter(r => !r.system).map(rowToCategory);
+    db.categories = [...DEFAULT_CATEGORIES, ...customCats];
+    db.labels     = labelRows.map(rowToLabel);
+
+    saveLocal();
+    setSyncStatus('✓ synchronisé', 'var(--green)');
+    return true;
   } catch(e) {
+    console.error('syncPull error:', e);
     setSyncStatus('⚠ hors ligne', 'var(--orange)');
     return false;
   } finally {
