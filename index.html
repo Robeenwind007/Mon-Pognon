@@ -499,7 +499,7 @@
 <div class="topbar">
   <h1>Auto<span>Thunes</span></h1>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px">
-    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.9.3</div>
+    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v1.9.6</div>
     <div style="display:flex;align-items:center;gap:6px">
       <div id="sync-status" style="font-size:10px;color:var(--muted)">…</div>
       <span onclick="forceSync()" title="Forcer la synchronisation"
@@ -631,21 +631,7 @@
   <!-- ══ PAGE: PARAMÈTRES ══ -->
   <div class="page" id="page-settings"><div style="display:flex;justify-content:flex-end;margin-bottom:4px"><button onclick="renderSettings();renderAccountsManage();renderRecurring();renderLoans()" style="background:var(--bg3);border:none;color:var(--muted);font-size:12px;padding:5px 10px;border-radius:10px;cursor:pointer">↺ Actualiser</button></div>
 
-    <!-- ── PEA / FINNHUB ── -->
-    <div class="section-title" style="margin-top:0">Cotations PEA</div>
-    <div class="card" id="finnhub-settings-card" style="padding:14px 16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div>
-          <div style="font-size:14px;font-weight:600;color:var(--text)">Clé API Finnhub</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px">Gratuite sur finnhub.io</div>
-        </div>
-        <div id="finnhub-key-status"></div>
-      </div>
-      <div id="finnhub-key-display" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);margin-bottom:10px;word-break:break-all"></div>
-      <button onclick="showFinnhubKeyPrompt()" class="btn btn-primary" style="width:100%;font-size:13px">
-        🔑 Configurer la clé API
-      </button>
-    </div>
+    <!-- ── PEA / FINNHUB ── (masqué) -->
 
     <div style="height:16px"></div>
 
@@ -810,7 +796,7 @@
   </div>
 
   <!-- ══ PAGE: PEA ══ -->
-  <div class="page" id="page-pea">
+  <div class="page" id="page-pea" style="display:none!important">
     <div style="display:flex;justify-content:flex-end;margin-bottom:4px">
       <button onclick="renderPea()" style="background:var(--bg3);border:none;color:var(--muted);font-size:12px;padding:5px 10px;border-radius:10px;cursor:pointer">↺ Actualiser</button>
     </div>
@@ -886,10 +872,7 @@
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
     Stats
   </div>
-  <div class="nav-item" onclick="showPage('pea',this)">
-    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-    PEA
-  </div>
+
   <div class="nav-item" onclick="showPage('settings',this)">
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
     Paramètres
@@ -998,7 +981,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '1.9.3';
+const APP_VERSION = '1.9.6';
 
 const DEFAULT_CATEGORIES = [
   { id:'salary',    label:'Salaire',      icon:'💼', color:'#10b981', system:true },
@@ -4122,7 +4105,10 @@ function openAddHolding(prefill) {
       </div>
 
       <div class="form-group">
-        <label>Ticker / Code <span id="hticker-hint" style="color:var(--muted);font-size:11px;font-weight:400">(ex: AI.PA pour Air Liquide)</span></label>
+        <label style="display:flex;align-items:center;justify-content:space-between">
+          <span>Ticker <span id="hticker-hint" style="color:var(--muted);font-size:11px;font-weight:400">(ex: AI.PA)</span></span>
+          <button type="button" onclick="openTickerSearch()" style="background:var(--bg3);border:1.5px solid var(--border);color:var(--text);font-size:12px;padding:5px 10px;border-radius:8px;cursor:pointer">&#x1F50D; Rechercher</button>
+        </label>
         <div style="display:flex;gap:8px;align-items:center">
           <input id="h-ticker" type="text" placeholder="AI.PA" value="${h.ticker||''}" style="text-transform:uppercase;flex:1" oninput="this.value=this.value.toUpperCase()">
           <div style="display:flex;border-radius:10px;overflow:hidden;border:1.5px solid var(--border);flex-shrink:0">
@@ -4186,6 +4172,56 @@ function setHoldingCurrency(cur) {
   if(!btnEur || !btnUsd) return;
   btnEur.style.cssText = `padding:8px 12px;border:none;font-size:12px;font-weight:700;cursor:pointer;transition:.15s;background:${cur==='EUR'?'var(--accent)':'var(--bg3)'};color:${cur==='EUR'?'#fff':'var(--muted)'}`;
   btnUsd.style.cssText = `padding:8px 12px;border:none;font-size:12px;font-weight:700;cursor:pointer;transition:.15s;background:${cur==='USD'?'#f59e0b':'var(--bg3)'};color:${cur==='USD'?'#fff':'var(--muted)'}`;
+
+async function openTickerSearch() {
+  const key = getFinnhubKey();
+  if(!key) { showFinnhubKeyPrompt('Clé API Finnhub requise.'); return; }
+  const old = document.getElementById('ticker-search-modal');
+  if(old) old.remove();
+  const modal = document.createElement('div');
+  modal.id = 'ticker-search-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:10000;display:flex;align-items:flex-end';
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'background:var(--card);border-radius:20px 20px 0 0;padding:20px;width:100%;max-height:80vh;display:flex;flex-direction:column;gap:12px;box-sizing:border-box';
+  wrap.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between"><strong style="font-size:16px">Rechercher un ticker</strong><button onclick="document.getElementById(\'ticker-search-modal\').remove()" style="background:var(--bg3);border:none;color:var(--muted);width:32px;height:32px;border-radius:50%;font-size:18px;cursor:pointer">×</button></div><input id="ticker-search-input" type="text" placeholder="Air Liquide, TotalEnergies…" style="width:100%;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1.5px solid var(--border);background:var(--bg3);color:var(--text);font-size:15px" oninput="searchTickers(this.value)" autocomplete="off"><div id="ticker-search-results" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px;min-height:80px"><div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">Tapez un nom de société pour rechercher</div></div>';
+  modal.appendChild(wrap);
+  document.body.appendChild(modal);
+  modal.onclick = e => { if(e.target === modal) modal.remove(); };
+  setTimeout(() => document.getElementById('ticker-search-input')?.focus(), 100);
+}
+
+let _tickerSearchTimeout = null;
+async function searchTickers(query) {
+  clearTimeout(_tickerSearchTimeout);
+  const el = document.getElementById('ticker-search-results');
+  if(!query||query.trim().length<2){el.innerHTML='<p style="text-align:center;color:var(--muted);padding:20px 0">Tapez un nom</p>';return;}
+  el.innerHTML='<p style="text-align:center;color:var(--muted);padding:20px 0">Recherche...</p>';
+  _tickerSearchTimeout=setTimeout(async()=>{
+    try{
+      const key=getFinnhubKey();
+      const res=await fetch(FINNHUB_API+'/search?q='+encodeURIComponent(query)+'&token='+key);
+      const data=await res.json();
+      const rs=(data.result||[]).filter(r=>r.type==='Common Stock'||r.type==='ETP');
+      if(!rs.length){el.innerHTML='<p style="text-align:center;color:var(--muted);padding:20px 0">Aucun r\u00e9sultat</p>';return;}
+      el.innerHTML=rs.slice(0,15).map(r=>{
+        const suf=r.symbol.includes('.')?r.symbol.split('.').pop():null;
+        const badge=suf
+          ?'<span style="background:rgba(99,102,241,.15);color:var(--accent);padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700">.' +suf+'</span>'
+          :'<span style="background:rgba(245,158,11,.15);color:#f59e0b;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700">US</span>';
+        const nm=r.description.replace(/'/g,"\\'" );
+        return '<div onclick="selectTicker(\''+r.symbol+'\',\''+nm+'\')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--bg3);border-radius:12px;cursor:pointer;gap:10px;border:1.5px solid transparent;transition:.15s" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.borderColor=\'transparent\'"><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+r.description+'</div><div style="font-size:12px;color:var(--muted);font-family:monospace">'+r.displaySymbol+'</div></div>'+badge+'</div>';
+      }).join('');
+    }catch(e){el.innerHTML='<p style="text-align:center;color:var(--red);padding:20px 0">Erreur</p>';}
+  },400);
+}
+function selectTicker(symbol,name){
+  const ti=document.getElementById('h-ticker');
+  const ni=document.getElementById('h-name');
+  if(ti)ti.value=symbol.toUpperCase();
+  if(ni&&!ni.value)ni.value=name;
+  setHoldingCurrency(symbol.includes('.')?'EUR':'USD');
+  document.getElementById('ticker-search-modal')?.remove();
+}
 }
 
 function updateHoldingTypeHints() {
