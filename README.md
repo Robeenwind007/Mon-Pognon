@@ -1,4 +1,4 @@
-# AutoThunes — v1.9.7
+# AutoThunes — v2.0.0
 
 Application web de gestion de finances personnelles. Single-file PWA, usage solo, pensée pour mobile.
 
@@ -68,7 +68,7 @@ Options d'hébergement :
 
 | Version | Changement |
 |---|---|
-| 1.9.7 | Tagline OBE sur l'écran de démarrage |
+| 2.0.0 | Tagline OBE + numéro de version sur l'écran de démarrage, padding latéral des opérations |
 | 1.9.6 | Masquage onglet PEA et section clé Finnhub dans les paramètres |
 | 1.9.5 | Nettoyage navigation |
 | 1.9.4 | Recherche ticker Finnhub dans le formulaire PEA |
