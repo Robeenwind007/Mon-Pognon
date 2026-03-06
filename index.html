@@ -20,6 +20,8 @@
     --bg3: #1a2235;
     --card: #151f33;
     --border: #1e2d45;
+    --bg-rgb: 10,15,30;
+    --card-rgb: 21,31,51;
     --accent: #3b82f6;
     --accent2: #22d3ee;
     --green: #10b981;
@@ -37,6 +39,8 @@
     --bg3: #e4eaf2;
     --card: #ffffff;
     --border: #d1dce8;
+    --bg-rgb: 240,244,248;
+    --card-rgb: 255,255,255;
     --accent: #2563eb;
     --accent2: #0891b2;
     --green: #059669;
@@ -54,6 +58,8 @@
       --bg3: #e4eaf2;
       --card: #ffffff;
       --border: #d1dce8;
+      --bg-rgb: 240,244,248;
+      --card-rgb: 255,255,255;
       --accent: #2563eb;
       --accent2: #0891b2;
       --green: #059669;
@@ -98,7 +104,7 @@
   /* ─── BOTTOM NAV ─── */
   .bottom-nav {
     position:fixed; bottom:0; left:0; right:0; z-index:100;
-    background:rgba(10,15,30,.9);
+    background:rgba(var(--bg-rgb),.92);
     backdrop-filter:blur(20px);
     -webkit-backdrop-filter:blur(20px);
     padding:10px 0 calc(env(safe-area-inset-bottom) + 6px);
@@ -1137,10 +1143,11 @@ function showPage(name, el) {
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
   if(el) el.classList.add('active');
+  applyTheme(localStorage.getItem('mp_theme') || 'dark');
   if(name==='stats') renderStats();
   if(name==='saisie') { renderOperations(); }
   if(name==='pea') { renderPea(); }
-  if(name==='settings') { renderSettings(); renderSettingsFinnhub(); renderAccountsManage(); renderRecurring(); renderLoans(); applyTheme(localStorage.getItem('mp_theme') || 'dark'); }
+  if(name==='settings') { renderSettings(); renderSettingsFinnhub(); renderAccountsManage(); renderRecurring(); renderLoans(); }
 }
 
 // ════════════════════════════════════
@@ -2188,9 +2195,11 @@ function renderRecurring() {
     const isActive   = r.active !== false;
     const notStarted = !isRecurringStarted(r, curMonthKey);
 
+    const accIconHTML  = acc   ? `<span style="display:inline-flex;align-items:center;gap:4px;vertical-align:middle">${accountIconHTML(acc.icon,16)} ${acc.name}</span>`   : '?';
+    const toAccIconHTML = toAcc ? `<span style="display:inline-flex;align-items:center;gap:4px;vertical-align:middle">${accountIconHTML(toAcc.icon,16)} ${toAcc.name}</span>` : '?';
     const subText = isTransfer
-      ? `${acc?acc.icon+' '+acc.name:'?'} → ${toAcc?toAcc.icon+' '+toAcc.name:'?'}`
-      : `${acc?acc.icon+' '+acc.name:'?'} · <span style="color:${cat.color}">${cat.icon} ${cat.label}</span>`;
+      ? `${accIconHTML} → ${toAccIconHTML}`
+      : `${accIconHTML} · <span style="color:${cat.color}">${cat.icon} ${cat.label}</span>`;
 
     const amtStyle = (!isActive || notStarted)
       ? 'color:var(--muted)'
@@ -2386,7 +2395,7 @@ function renderDashboard() {
             <div style="font-size:24px">🏦</div>
             <div style="flex:1">
               <div style="font-size:15px;font-weight:600">${loan.label}</div>
-              <div style="font-size:11px;color:var(--muted);margin-top:1px">${acc?acc.icon+' '+acc.name:'?'}</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:1px;display:flex;align-items:center;gap:4px">${acc?`${accountIconHTML(acc.icon,14)} ${acc.name}`:'?'}</div>
             </div>
             <div style="text-align:right">
               <div style="font-size:11px;color:var(--muted)">Capital restant</div>
@@ -2434,9 +2443,11 @@ function renderDashboard() {
       const toAcc = isTransfer ? db.accounts.find(a=>a.id===t.transferTo) : null;
       const icon  = isTransfer ? '⇄' : cat.icon;
       const bgCol = isTransfer ? 'rgba(59,130,246,.12)' : (t.type==='income'?'rgba(16,185,129,.12)':'rgba(244,63,94,.12)');
+      const accChipD  = acc   ? `<span style="display:inline-flex;align-items:center;gap:3px;vertical-align:middle">${accountIconHTML(acc.icon,13)} ${acc.name}</span>`   : '?';
+      const toAccChipD = toAcc ? `<span style="display:inline-flex;align-items:center;gap:3px;vertical-align:middle">${accountIconHTML(toAcc.icon,13)} ${toAcc.name}</span>` : '?';
       const subText = isTransfer
-        ? `${t.date} · ${acc?acc.name:'?'} → ${toAcc?toAcc.name:'?'}`
-        : `${t.date} · ${acc?acc.name:'?'} · ${cat.label}`;
+        ? `${t.date} · ${accChipD} → ${toAccChipD}`
+        : `${t.date} · ${accChipD} · ${cat.label}`;
       const amtColor = isTransfer ? 'style="color:var(--accent)"' : '';
       const amtPrefix = isTransfer ? '⇄' : (t.type==='income'?'+':'-');
       return `<div class="tx-item">
@@ -2478,9 +2489,11 @@ function renderDashboard() {
       const amtColor = isTransfer ? 'color:var(--accent)' : isIncome ? 'color:var(--green)' : 'color:var(--red)';
       const amtPrefix = isTransfer ? '⇄' : isIncome ? '+' : '-';
       const dateStr  = `${yr}-${mo}-${String(r.day).padStart(2,'0')}`;
+      const accChipU  = acc   ? `<span style="display:inline-flex;align-items:center;gap:3px;vertical-align:middle">${accountIconHTML(acc.icon,13)} ${acc.name}</span>`   : '?';
+      const toAccChipU = toAcc ? `<span style="display:inline-flex;align-items:center;gap:3px;vertical-align:middle">${accountIconHTML(toAcc.icon,13)} ${toAcc.name}</span>` : '?';
       const subText  = isTransfer
-        ? `${dateStr} · ${acc?acc.name:'?'} → ${toAcc?toAcc.name:'?'}`
-        : `${dateStr} · ${acc?acc.name:'?'} · ${cat.label}`;
+        ? `${dateStr} · ${accChipU} → ${toAccChipU}`
+        : `${dateStr} · ${accChipU} · ${cat.label}`;
       const pointed  = r.pointed && r.pointed[monthKey];
       const pointedStyle = pointed ? 'opacity:.45;text-decoration:line-through' : '';
       return `<div class="tx-item" style="${pointedStyle}">
@@ -2564,9 +2577,11 @@ function renderOperations() {
       const bgCol  = isT ? 'rgba(59,130,246,.12)' : t.type==='income' ? 'rgba(16,185,129,.12)' : 'rgba(244,63,94,.12)';
       const amtCol = isT ? 'var(--accent)' : t.type==='income' ? 'var(--green)' : 'var(--red)';
       const prefix = isT ? '⇄' : t.type==='income' ? '+' : '-';
+      const accChip  = acc   ? `<span style="display:inline-flex;align-items:center;gap:3px;vertical-align:middle">${accountIconHTML(acc.icon,13)} ${acc.name}</span>`   : '?';
+      const toAccChip = toAcc ? `<span style="display:inline-flex;align-items:center;gap:3px;vertical-align:middle">${accountIconHTML(toAcc.icon,13)} ${toAcc.name}</span>` : '?';
       const sub    = isT
-        ? `${t.date} · ${acc?acc.name:'?'} → ${toAcc?toAcc.name:'?'}`
-        : `${t.date} · ${acc?acc.name:'?'} · ${cat.label}`;
+        ? `${t.date} · ${accChip} → ${toAccChip}`
+        : `${t.date} · ${accChip} · ${cat.label}`;
 
       const today   = new Date().toISOString().substring(0,10);
       const isFuture = t.date > today;
@@ -2689,7 +2704,7 @@ function renderStats() {
       const real = accountBalance(accountId);
       const theo = accountTheoBalance(accountId);
       balCard.innerHTML = `
-        <div class="card-label">${acc?acc.icon+' '+acc.name:''}</div>
+        <div class="card-label" style="display:flex;align-items:center;gap:4px">${acc?`${accountIconHTML(acc.icon,14)} ${acc.name}`:''}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
           <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Solde réel</div><div style="font-family:'DM Mono',monospace;font-size:17px;font-weight:700;color:${real>=0?'var(--accent2)':'var(--red)'}">${fmt(real)}</div></div>
           <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Solde théorique</div><div style="font-family:'DM Mono',monospace;font-size:17px;font-weight:700;color:${theo>=0?'var(--green)':'var(--red)'}">${fmt(theo)}</div></div>
@@ -2738,7 +2753,7 @@ function renderDonut(data, total) {
 
   const entries = Object.entries(data).sort((a,b)=>b[1]-a[1]);
   if(!entries.length || total===0) {
-    ctx.fillStyle='#1a2235'; ctx.beginPath(); ctx.arc(60,60,50,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--bg3').trim()||'#1a2235'; ctx.beginPath(); ctx.arc(60,60,50,0,Math.PI*2); ctx.fill();
     ctx.fillStyle='#64748b'; ctx.beginPath(); ctx.arc(60,60,30,0,Math.PI*2); ctx.fill();
     legend.innerHTML='<div style="font-size:12px;color:var(--muted)">Aucune donnée</div>';
     return;
@@ -2752,7 +2767,7 @@ function renderDonut(data, total) {
     ctx.fillStyle=cat.color; ctx.fill();
     angle+=slice;
   });
-  ctx.fillStyle='#151f33'; ctx.beginPath(); ctx.arc(60,60,32,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--card').trim()||'#151f33'; ctx.beginPath(); ctx.arc(60,60,32,0,Math.PI*2); ctx.fill();
 
   legend.innerHTML = entries.slice(0,5).map(([catId, amt])=>{
     const cat = CATEGORIES.find(c=>c.id===catId)||CATEGORIES[8];
@@ -3419,7 +3434,7 @@ function renderLoans() {
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
         <div style="flex:1;min-width:0">
           <div style="font-size:14px;font-weight:700;color:var(--text)">${loan.label}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px">${acc?acc.icon+' '+acc.name:'?'} · Prélevé le ${loan.day} · 1ère échéance ${loan.firstPayment ? new Date(loan.firstPayment).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}) : '—'}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${acc?`${accountIconHTML(acc.icon,14)} ${acc.name}`:'?'} · Prélevé le ${loan.day} · 1ère échéance ${loan.firstPayment ? new Date(loan.firstPayment).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}) : '—'}</div>
         </div>
         <div style="display:flex;gap:10px;align-items:center;margin-left:10px;flex-shrink:0">
           <span style="font-size:16px;cursor:pointer" onclick="openEditLoan('${loan.id}')">✏️</span>
