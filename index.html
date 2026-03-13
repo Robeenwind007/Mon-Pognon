@@ -1030,6 +1030,13 @@
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
 const APP_VERSION = '2.0.0';
+
+// Render account icon: image if base64, emoji otherwise
+function iconHTML(icon, size='26px') {
+  if(!icon) return '<span style="font-size:' + size + '">🏦</span>';
+  if(icon.startsWith('data:')) return '<img src="' + icon + '" style="width:' + size + ';height:' + size + ';border-radius:6px;object-fit:cover">';
+  return '<span style="font-size:' + size + '">' + icon + '</span>';
+}
 document.getElementById('splash-version').textContent = APP_VERSION;
 
 
@@ -1111,7 +1118,7 @@ function populateSelects() {
   accSelects.forEach(id => {
     const el = document.getElementById(id); if(!el) return;
     el.innerHTML = db.accounts.length
-      ? db.accounts.map(a=>`<option value="${a.id}">${a.icon} ${a.name}</option>`).join('')
+      ? db.accounts.map(a=>`<option value="${a.id}">${a.icon&&a.icon.startsWith('data:')?' &#127968;':a.icon} ${a.name}</option>`).join('')
       : '<option value="">— Aucun compte —</option>';
   });
   catSelects.forEach(id => {
@@ -1421,7 +1428,7 @@ function renderAccountsManage() {
                                   : `<span style="font-size:14px;line-height:1;cursor:pointer;color:var(--muted)" onclick="moveAccount('${a.id}',1)">▼</span>`;
     return `<div class="tx-item" style="${!included?'opacity:.6':''}">
       <div style="display:flex;flex-direction:column;gap:2px;margin-right:6px">${btnUp}${btnDown}</div>
-      <div class="tx-icon expense">${a.icon}</div>
+      <div class="tx-icon expense">${iconHTML(a.icon, '22px')}</div>
       <div class="tx-info">
         <div class="tx-name">${a.name}</div>
         <div class="tx-sub">${typeInfo.label}${included?' · <span style="color:var(--green);font-size:10px">Inclus dans les totaux</span>':' · <span style="color:var(--muted);font-size:10px">Hors totaux</span>'}</div>
@@ -1756,8 +1763,8 @@ function openEditTransaction(id) {
   const old = document.getElementById('edit-tx-modal');
   if(old) old.remove();
 
-  const accOptions = db.accounts.map(a=>`<option value="${a.id}" ${a.id===t.accountId?'selected':''}>${a.icon} ${a.name}</option>`).join('');
-  const accToOptions = db.accounts.map(a=>`<option value="${a.id}" ${a.id===t.transferTo?'selected':''}>${a.icon} ${a.name}</option>`).join('');
+  const accOptions = db.accounts.map(a=>`<option value="${a.id}" ${a.id===t.accountId?'selected':''}>${a.icon&&a.icon.startsWith('data:')?'🏦':a.icon} ${a.name}</option>`).join('');
+  const accToOptions = db.accounts.map(a=>`<option value="${a.id}" ${a.id===t.transferTo?'selected':''}>${a.icon&&a.icon.startsWith('data:')?'🏦':a.icon} ${a.name}</option>`).join('');
   const catOptions = CATEGORIES.map(c=>`<option value="${c.id}" ${c.id===t.category?'selected':''}>${c.icon} ${c.label}</option>`).join('');
 
   const modal = document.createElement('div');
@@ -2069,8 +2076,8 @@ function renderRecurring() {
     const notStarted = !isRecurringStarted(r, curMonthKey);
 
     const subText = isTransfer
-      ? `${acc?acc.icon+' '+acc.name:'?'} → ${toAcc?toAcc.icon+' '+toAcc.name:'?'}`
-      : `${acc?acc.icon+' '+acc.name:'?'} · <span style="color:${cat.color}">${cat.icon} ${cat.label}</span>`;
+      ? `${acc?(acc.icon&&acc.icon.startsWith('data:')?'🏦':acc.icon)+' '+acc.name:'?'} → ${toAcc?toAcc.icon+' '+toAcc.name:'?'}`
+      : `${acc?(acc.icon&&acc.icon.startsWith('data:')?'🏦':acc.icon)+' '+acc.name:'?'} · <span style="color:${cat.color}">${cat.icon} ${cat.label}</span>`;
 
     const amtStyle = (!isActive || notStarted)
       ? 'color:var(--muted)'
@@ -2218,7 +2225,7 @@ function renderDashboard() {
 
       return `<div class="card" style="padding:14px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-          <div style="font-size:24px">${a.icon}</div>
+          <div>${iconHTML(a.icon, '28px')}</div>
           <div>
             <div style="font-size:15px;font-weight:600">${a.name}</div>
             <div style="font-size:11px;color:var(--muted);margin-top:1px">${typeInfo.label}</div>
@@ -2266,7 +2273,7 @@ function renderDashboard() {
             <div style="font-size:24px">🏦</div>
             <div style="flex:1">
               <div style="font-size:15px;font-weight:600">${loan.label}</div>
-              <div style="font-size:11px;color:var(--muted);margin-top:1px">${acc?acc.icon+' '+acc.name:'?'}</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:1px">${acc?(acc.icon&&acc.icon.startsWith('data:')?'🏦':acc.icon)+' '+acc.name:'?'}</div>
             </div>
             <div style="text-align:right">
               <div style="font-size:11px;color:var(--muted)">Capital restant</div>
@@ -2536,7 +2543,7 @@ function populateStatsAccountFilter() {
   if(!sel) return;
   const current = sel.value;
   sel.innerHTML = '<option value="all">🌐 Situation globale</option>' +
-    db.accounts.map(a=>`<option value="${a.id}">${a.icon} ${a.name}</option>`).join('');
+    db.accounts.map(a=>`<option value="${a.id}">${a.icon&&a.icon.startsWith('data:')?' &#127968;':a.icon} ${a.name}</option>`).join('');
   // Restaure la sélection si le compte existe toujours
   if(current && [...sel.options].some(o=>o.value===current)) sel.value = current;
 }
@@ -3076,7 +3083,7 @@ function deleteCategory(id) {
 // ════════════════════════════════════
 function openLoanForm() {
   const sel = document.getElementById('loan-account');
-  sel.innerHTML = db.accounts.map(a=>`<option value="${a.id}">${a.icon} ${a.name}</option>`).join('');
+  sel.innerHTML = db.accounts.map(a=>`<option value="${a.id}">${a.icon&&a.icon.startsWith('data:')?' &#127968;':a.icon} ${a.name}</option>`).join('');
   document.getElementById('loan-start').value = today();
   document.getElementById('loan-first-payment').value = '';
   document.getElementById('loan-form').style.display = 'block';
@@ -3294,7 +3301,7 @@ function renderLoans() {
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
         <div style="flex:1;min-width:0">
           <div style="font-size:14px;font-weight:700;color:var(--text)">${loan.label}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px">${acc?acc.icon+' '+acc.name:'?'} · Prélevé le ${loan.day} · 1ère échéance ${loan.firstPayment ? new Date(loan.firstPayment).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}) : '—'}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${acc?iconHTML(acc.icon,'16px')+' '+acc.name:'?'} · Prélevé le ${loan.day} · 1ère échéance ${loan.firstPayment ? new Date(loan.firstPayment).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}) : '—'}</div>
         </div>
         <div style="display:flex;gap:10px;align-items:center;margin-left:10px;flex-shrink:0">
           <span style="font-size:16px;cursor:pointer" onclick="openEditLoan('${loan.id}')">✏️</span>
