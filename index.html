@@ -676,8 +676,31 @@
     <div class="card" id="cat-detail-list"></div>
   </div>
 
+  <!-- ══ PAGE : RÉCURRENTES ══ -->
+  <div class="page" id="page-recurring">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:4px">
+      <button onclick="renderRecurring()" style="background:var(--bg3);border:none;color:var(--muted);font-size:12px;padding:5px 10px;border-radius:10px;cursor:pointer">↺ Actualiser</button>
+    </div>
+    <div class="card" style="background:rgba(245,158,11,.07);border-color:rgba(245,158,11,.2);margin-bottom:12px">
+      <div style="font-size:12px;color:var(--orange);font-weight:600;margin-bottom:2px">ℹ️ Opérations récurrentes</div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.5">Déduites automatiquement chaque mois selon le jour prévu.</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <div class="section-title" style="margin:0;flex:1">Récurrentes</div>
+      <select id="rec-filter-account" onchange="renderRecurring()"
+        style="font-size:12px;padding:5px 8px;border-radius:10px;background:var(--bg3);border:1px solid var(--border);color:var(--text);max-width:140px">
+        <option value="">Tous les comptes</option>
+      </select>
+    </div>
+    <div id="recurring-list">
+      <div class="empty-state"><span class="emoji">🔄</span><p>Aucune opération récurrente</p></div>
+    </div>
+    <button class="btn btn-primary" onclick="openSheet('recurring-sheet')" style="margin-top:8px;width:100%">+ Ajouter une opération récurrente</button>
+    <div style="height:80px"></div>
+  </div>
+
   <!-- ══ PAGE: PARAMÈTRES ══ -->
-  <div class="page" id="page-settings"><div style="display:flex;justify-content:flex-end;margin-bottom:4px"><button onclick="renderSettings();renderAccountsManage();renderRecurring();renderLoans()" style="background:var(--bg3);border:none;color:var(--muted);font-size:12px;padding:5px 10px;border-radius:10px;cursor:pointer">↺ Actualiser</button></div>
+  <div class="page" id="page-settings"><div style="display:flex;justify-content:flex-end;margin-bottom:4px"><button onclick="renderSettings();renderAccountsManage();renderLoans()" style="background:var(--bg3);border:none;color:var(--muted);font-size:12px;padding:5px 10px;border-radius:10px;cursor:pointer">↺ Actualiser</button></div>
 
     <!-- ── PEA / FINNHUB ── (masqué) -->
 
@@ -703,25 +726,6 @@
     <div class="section-title">Comptes</div>
     <div class="card" id="accounts-list-manage"></div>
     <button class="btn btn-primary" onclick="openSheet('account-sheet')" style="margin-top:8px;width:100%">+ Créer un compte</button>
-
-    <div style="height:16px"></div>
-
-    <!-- ── RÉCURRENTS ── -->
-    <div class="card" style="background:rgba(245,158,11,.07);border-color:rgba(245,158,11,.2);margin-bottom:8px">
-      <div style="font-size:12px;color:var(--orange);font-weight:600;margin-bottom:2px">ℹ️ Opérations récurrentes</div>
-      <div style="font-size:11px;color:var(--muted);line-height:1.5">Déduites automatiquement chaque mois selon le jour prévu.</div>
-    </div>
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-      <div class="section-title" style="margin:0;flex:1">Récurrentes</div>
-      <select id="rec-filter-account" onchange="renderRecurring()"
-        style="font-size:12px;padding:5px 8px;border-radius:10px;background:var(--bg3);border:1px solid var(--border);color:var(--text);max-width:140px">
-        <option value="">Tous les comptes</option>
-      </select>
-    </div>
-    <div id="recurring-list">
-      <div class="empty-state"><span class="emoji">🔄</span><p>Aucune opération récurrente</p></div>
-    </div>
-    <button class="btn btn-primary" onclick="openSheet('recurring-sheet')" style="margin-top:8px;width:100%">+ Ajouter une opération récurrente</button>
 
     <div style="height:16px"></div>
 
@@ -920,7 +924,10 @@
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
     Stats
   </div>
-
+  <div class="nav-item" onclick="showPage('recurring',this)">
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+    Récurrentes
+  </div>
   <div class="nav-item" onclick="showPage('settings',this)">
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
     Paramètres
@@ -947,8 +954,8 @@
     <button onclick="event.stopPropagation();closeSheet('add-sheet')" style="background:var(--bg3);border:none;color:var(--muted);font-size:20px;width:34px;height:34px;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
   </div>
   <div class="type-toggle" style="grid-template-columns:1fr 1fr 1fr">
-    <div class="type-btn active income" id="sheet-btn-income" onclick="setSheetType('income')">+ Recette</div>
-    <div class="type-btn expense" id="sheet-btn-expense" onclick="setSheetType('expense')">− Dépense</div>
+    <div class="type-btn income" id="sheet-btn-income" onclick="setSheetType('income')">+ Recette</div>
+    <div class="type-btn active expense" id="sheet-btn-expense" onclick="setSheetType('expense')">− Dépense</div>
     <div class="type-btn transfer" id="sheet-btn-transfer" onclick="setSheetType('transfer')">⇄ Virement</div>
   </div>
   <div class="form-group">
@@ -1029,13 +1036,19 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.0.4';
 
 // Render account icon: image if base64, emoji otherwise
 function iconHTML(icon, size='26px') {
   if(!icon) return '<span style="font-size:' + size + '">🏦</span>';
   if(icon.startsWith('data:')) return '<img src="' + icon + '" style="width:' + size + ';height:' + size + ';border-radius:6px;object-fit:cover">';
   return '<span style="font-size:' + size + '">' + icon + '</span>';
+}
+// Retourne l'icône texte d'un compte (fallback 🏦 si base64)
+function accIconLabel(acc) {
+  if(!acc) return '?';
+  const icon = acc.icon && acc.icon.startsWith('data:') ? '🏦' : (acc.icon || '🏦');
+  return icon + ' ' + acc.name;
 }
 document.getElementById('splash-version').textContent = APP_VERSION;
 
@@ -1072,7 +1085,7 @@ function getCategories() { return db.categories || DEFAULT_CATEGORIES; }
 // Alias pour compatibilité avec tout le code existant
 Object.defineProperty(window, 'CATEGORIES', { get: getCategories });
 
-let currentType = 'income';
+let currentType = 'expense';
 let currentSheetType = 'income';
 let selectedIcon = '🏦';
 let currentPeriod = 'month';
@@ -1139,7 +1152,8 @@ function showPage(name, el) {
   if(name==='stats') renderStats();
   if(name==='saisie') { renderOperations(); }
   if(name==='pea') { renderPea(); }
-  if(name==='settings') { renderSettings(); renderSettingsFinnhub(); renderAccountsManage(); renderRecurring(); renderLoans(); applyTheme(localStorage.getItem('mp_theme') || 'dark'); }
+  if(name==='recurring') { renderRecurring(); }
+  if(name==='settings') { renderSettings(); renderSettingsFinnhub(); renderAccountsManage(); renderLoans(); applyTheme(localStorage.getItem('mp_theme') || 'dark'); }
 }
 
 // ════════════════════════════════════
@@ -1165,7 +1179,8 @@ function refreshAll() {
   else if(id === 'page-saisie') { renderDashboard(); renderOperations(); }
   else if(id === 'page-stats') { renderStats(); }
   else if(id === 'page-pea') { renderPea(); }
-  else if(id === 'page-settings') { renderSettings(); renderSettingsFinnhub(); renderAccountsManage(); renderRecurring(); renderLoans(); }
+  else if(id === 'page-recurring') { renderRecurring(); }
+  else if(id === 'page-settings') { renderSettings(); renderSettingsFinnhub(); renderAccountsManage(); renderLoans(); }
 }
 
 function closeSheet(name) {
@@ -1292,11 +1307,22 @@ function accountBalance(accId) {
 }
 
 function accountMonthBalance(accId) {
-  // Solde fin de mois = solde réel + récurrentes du mois pas encore passées
+  // Solde fin de mois = solde réel + opérations manuelles futures du mois + récurrentes du mois pas encore passées
   const now = new Date();
   const todayDay = now.getDate();
   const monthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const todayStr = today();
   const real = accountBalance(accId);
+
+  // Opérations manuelles saisies avec une date future dans le mois en cours
+  const futureTxs = db.transactions.filter(t =>
+    t.accountId === accId &&
+    t.date > todayStr &&
+    t.date.startsWith(monthKey)
+  );
+  const futureTxBalance = futureTxs.reduce((s, t) =>
+    s + (t.type === 'income' ? t.amount : -t.amount), 0
+  );
 
   // Charges récurrentes en attente (expense, hors virements)
   const pendingCharges = db.recurringCharges.filter(r=>{
@@ -1336,7 +1362,7 @@ function accountMonthBalance(accId) {
   const pendingIn  = pendingTransfersIn.reduce((s,r)=>s+r.amount,0)
                    + pendingIncomes.reduce((s,r)=>s+r.amount,0);
 
-  return real - pendingOut + pendingIn;
+  return real + futureTxBalance - pendingOut + pendingIn;
 }
 
 function accountTheoBalance(accId) {
@@ -1918,10 +1944,10 @@ function openEditRecurring(id) {
   const isIncome   = r.type === 'income';
 
   const accOptions = db.accounts.map(a =>
-    `<option value="${a.id}" ${a.id===r.accountId?'selected':''}>${a.icon} ${a.name}</option>`
+    `<option value="${a.id}" ${a.id===r.accountId?'selected':''}>${a.icon&&a.icon.startsWith('data:')?'🏦':a.icon} ${a.name}</option>`
   ).join('');
   const accOptionsTo = db.accounts.map(a =>
-    `<option value="${a.id}" ${a.id===r.toAccountId?'selected':''}>${a.icon} ${a.name}</option>`
+    `<option value="${a.id}" ${a.id===r.toAccountId?'selected':''}>${a.icon&&a.icon.startsWith('data:')?'🏦':a.icon} ${a.name}</option>`
   ).join('');
   const catOptions = getCategories().map(c =>
     `<option value="${c.id}" ${c.id===r.category?'selected':''}>${c.icon} ${c.label}</option>`
@@ -2029,7 +2055,7 @@ function renderRecurring() {
   if(filterSel) {
     const currentFilter = filterSel.value;
     filterSel.innerHTML = '<option value="">Tous les comptes</option>' +
-      db.accounts.map(a => `<option value="${a.id}" ${a.id===currentFilter?'selected':''}>${a.icon} ${a.name}</option>`).join('');
+      db.accounts.map(a => `<option value="${a.id}" ${a.id===currentFilter?'selected':''}>${a.icon&&a.icon.startsWith('data:')?'🏦':a.icon} ${a.name}</option>`).join('');
     filterSel.value = currentFilter;
   }
   const filterAccId = filterSel ? filterSel.value : '';
@@ -2076,8 +2102,8 @@ function renderRecurring() {
     const notStarted = !isRecurringStarted(r, curMonthKey);
 
     const subText = isTransfer
-      ? `${acc?(acc.icon&&acc.icon.startsWith('data:')?'🏦':acc.icon)+' '+acc.name:'?'} → ${toAcc?toAcc.icon+' '+toAcc.name:'?'}`
-      : `${acc?(acc.icon&&acc.icon.startsWith('data:')?'🏦':acc.icon)+' '+acc.name:'?'} · <span style="color:${cat.color}">${cat.icon} ${cat.label}</span>`;
+      ? `${accIconLabel(acc)} → ${accIconLabel(toAcc)}`
+      : `${accIconLabel(acc)} · <span style="color:${cat.color}">${cat.icon} ${cat.label}</span>`;
 
     const amtStyle = (!isActive || notStarted)
       ? 'color:var(--muted)'
@@ -2404,7 +2430,7 @@ function renderOperations() {
   if(accSel) {
     const cur = accSel.value;
     accSel.innerHTML = '<option value="">Tous les comptes</option>' +
-      db.accounts.map(a=>`<option value="${a.id}" ${a.id===cur?'selected':''}>${a.icon} ${a.name}</option>`).join('');
+      db.accounts.map(a=>`<option value="${a.id}" ${a.id===cur?'selected':''}>${a.icon&&a.icon.startsWith('data:')?'🏦':a.icon} ${a.name}</option>`).join('');
     accSel.value = cur;
   }
 
@@ -2571,7 +2597,7 @@ function renderStats() {
       const real = accountBalance(accountId);
       const theo = accountTheoBalance(accountId);
       balCard.innerHTML = `
-        <div class="card-label">${acc?acc.icon+' '+acc.name:''}</div>
+        <div class="card-label">${acc ? accIconLabel(acc) : ''}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
           <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Solde réel</div><div style="font-family:'DM Mono',monospace;font-size:17px;font-weight:700;color:${real>=0?'var(--accent2)':'var(--red)'}">${fmt(real)}</div></div>
           <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Solde théorique</div><div style="font-family:'DM Mono',monospace;font-size:17px;font-weight:700;color:${theo>=0?'var(--green)':'var(--red)'}">${fmt(theo)}</div></div>
@@ -3155,7 +3181,7 @@ function openEditLoan(id) {
   if(old) old.remove();
 
   const accOptions = db.accounts.map(a=>
-    `<option value="${a.id}" ${a.id===loan.accountId?'selected':''}>${a.icon} ${a.name}</option>`
+    `<option value="${a.id}" ${a.id===loan.accountId?'selected':''}>${a.icon&&a.icon.startsWith('data:')?'🏦':a.icon} ${a.name}</option>`
   ).join('');
 
   const modal = document.createElement('div');
