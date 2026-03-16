@@ -547,7 +547,7 @@
 <div class="topbar">
   <h1>Auto<span>Thunes</span></h1>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px">
-    <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">v2.0.0</div>
+    <div id="header-version" style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace"></div>
     <div style="display:flex;align-items:center;gap:6px">
       <div id="sync-status" style="font-size:10px;color:var(--muted)">…</div>
       <span onclick="forceSync()" title="Forcer la synchronisation"
@@ -1036,7 +1036,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '2.0.4';
+const APP_VERSION = '2.1.4';
 
 // Render account icon: image if base64, emoji otherwise
 function iconHTML(icon, size='26px') {
@@ -1051,6 +1051,7 @@ function accIconLabel(acc) {
   return icon + ' ' + acc.name;
 }
 document.getElementById('splash-version').textContent = APP_VERSION;
+document.getElementById('header-version').textContent = 'v' + APP_VERSION;
 
 
 const DEFAULT_CATEGORIES = [
@@ -1086,7 +1087,7 @@ function getCategories() { return db.categories || DEFAULT_CATEGORIES; }
 Object.defineProperty(window, 'CATEGORIES', { get: getCategories });
 
 let currentType = 'expense';
-let currentSheetType = 'income';
+let currentSheetType = 'expense';
 let selectedIcon = '🏦';
 let currentPeriod = 'month';
 let periodOffset = 0;
