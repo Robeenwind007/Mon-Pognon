@@ -1036,7 +1036,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '2.1.4';
+const APP_VERSION = '2.1.7';
 
 // Render account icon: image if base64, emoji otherwise
 function iconHTML(icon, size='26px') {
@@ -1299,11 +1299,11 @@ function deleteAccount(id) {
 }
 
 function accountBalance(accId) {
-  // Solde réel = toutes les transactions à date d'aujourd'hui et avant
+  // Solde réel = toutes les transactions à date d'aujourd'hui et avant, hors dépointées
   const acc = db.accounts.find(a=>a.id===accId);
   if(!acc) return 0;
   const todayStr = today();
-  const txs = db.transactions.filter(t=>t.accountId===accId && t.date<=todayStr);
+  const txs = db.transactions.filter(t=>t.accountId===accId && t.date<=todayStr && !t.unpointed);
   return acc.initialBalance + txs.reduce((s,t)=>s+(t.type==='income'?t.amount:-t.amount),0);
 }
 
@@ -1916,6 +1916,65 @@ function addRecurring() {
   setRecType('expense');
 }
 
+function toggleTransactionPointing(id) {
+  const t = db.transactions.find(x=>x.id===id);
+  if(!t) return;
+  t.unpointed = !t.unpointed;
+  markDirty('transactions', t.id);
+  // Pour un virement récurrent, synchroniser la jambe partenaire
+  if(t.isTransfer && t.transferId) {
+    const partner = db.transactions.find(x=>x.transferId===t.transferId && x.id!==t.id);
+    if(partner) { partner.unpointed = t.unpointed; markDirty('transactions', partner.id); }
+  }
+  save();
+  refreshAll();
+}
+
+function forceApplyRecurring(id) {
+  const r = db.recurringCharges.find(r=>r.id===id);
+  if(!r) return;
+  const now = new Date();
+  const yr  = now.getFullYear();
+  const mo  = String(now.getMonth()+1).padStart(2,'0');
+  const monthKey = `${yr}-${mo}`;
+  const today = now.toISOString().substring(0,10);
+
+  if(!r.applied) r.applied = [];
+  if(r.applied.includes(monthKey)) { showToast('Déjà comptabilisé ce mois'); return; }
+
+  if(r.type === 'transfer' && r.toAccountId) {
+    const transferId = `rec-${r.id}-${monthKey}`;
+    const txOut = { id: transferId+'_out', label: r.label+' (récurrent)', amount: r.amount,
+      accountId: r.accountId, category:'savings', date: today,
+      type:'expense', isTransfer:true, transferId, transferTo: r.toAccountId, isRecurring:true };
+    const txIn  = { id: transferId+'_in',  label: r.label+' (récurrent)', amount: r.amount,
+      accountId: r.toAccountId, category:'savings', date: today,
+      type:'income', isTransfer:true, transferId, transferFrom: r.accountId, isRecurring:true };
+    db.transactions.push(txOut);
+    db.transactions.push(txIn);
+    markDirty('transactions', txOut.id);
+    markDirty('transactions', txIn.id);
+  } else if(r.type === 'income') {
+    const tx = { id: `rec-${r.id}-${monthKey}`, label: r.label+' (récurrent)', amount: r.amount,
+      accountId: r.accountId, category: r.category||'salary', date: today,
+      type:'income', isRecurring:true };
+    db.transactions.push(tx);
+    markDirty('transactions', tx.id);
+  } else {
+    const tx = { id: `rec-${r.id}-${monthKey}`, label: r.label+' (récurrent)', amount: r.amount,
+      accountId: r.accountId, category: r.category||'other', date: today,
+      type:'expense', isRecurring:true };
+    db.transactions.push(tx);
+    markDirty('transactions', tx.id);
+  }
+  r.applied.push(monthKey);
+  markDirty('recurring', r.id);
+  _dirty.newApplied.push({ recurring_charge_id: r.id, month_key: monthKey });
+  save();
+  refreshAll();
+  showToast(`✓ "${r.label}" comptabilisé${r.type==='income'?'':'e'} aujourd'hui`);
+}
+
 function deleteRecurring(id) {
   const r = db.recurringCharges.find(r=>r.id===id);
   if(!r) return;
@@ -2122,11 +2181,15 @@ function renderRecurring() {
       ? (() => { const [y,m] = r.startMonthKey.split('-'); return new Date(y,m-1,r.day).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}); })()
       : null;
 
+    const isApplied  = r.applied && r.applied.includes(curMonthKey);
+    // Bouton "Comptabiliser maintenant" : actif, démarré, non encore appliqué ce mois
+    const canForce   = isActive && !notStarted && !isApplied;
+
     const statusDot = !isActive
       ? `<span style="font-size:10px;color:var(--muted);font-weight:600">⏸ inactif</span>`
       : notStarted
         ? `<span style="font-size:10px;color:var(--accent);font-weight:600">📅 démarre le ${firstDate}</span>`
-        : passed
+        : isApplied
           ? `<span style="font-size:10px;color:var(--green);font-weight:600">✓ passé${isIncome?'':'e'}</span>`
           : `<span style="font-size:10px;color:var(--orange);font-weight:600">⏳ à venir</span>`;
 
@@ -2149,7 +2212,7 @@ function renderRecurring() {
       </label>`;
 
     return `<div class="recurring-item" style="${(!isActive||notStarted)?'opacity:.5':''}">
-      <div class="rec-day" style="background:${!isActive?'rgba(148,163,184,.1)':notStarted?'rgba(59,130,246,.08)':passed?'rgba(16,185,129,.1)':'rgba(245,158,11,.1)'};color:${!isActive?'var(--muted)':notStarted?'var(--accent)':passed?'var(--green)':'var(--orange)'}">
+      <div class="rec-day" style="background:${!isActive?'rgba(148,163,184,.1)':notStarted?'rgba(59,130,246,.08)':isApplied?'rgba(16,185,129,.1)':'rgba(245,158,11,.1)'};color:${!isActive?'var(--muted)':notStarted?'var(--accent)':isApplied?'var(--green)':'var(--orange)'}">
         <span>${r.day}</span><span>du mois</span>
       </div>
       <div class="rec-info">
@@ -2160,6 +2223,7 @@ function renderRecurring() {
         </div>
         <div class="rec-sub">${subText}</div>
         <div style="margin-top:3px">${statusDot}</div>
+        ${canForce ? `<button onclick="forceApplyRecurring('${r.id}')" style="margin-top:5px;font-size:10px;font-weight:600;padding:3px 8px;border-radius:8px;border:none;background:rgba(245,158,11,.18);color:var(--orange);cursor:pointer">⚡ Comptabiliser maintenant</button>` : ''}
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
         <div class="rec-amt" style="${amtStyle}">${amtPrefix}${fmt(r.amount)}</div>
@@ -2438,8 +2502,8 @@ function renderOperations() {
   const filterAcc  = accSel ? accSel.value : '';
   const filterType = document.getElementById('ops-filter-type')?.value || '';
 
-  // Toutes les transactions non récurrentes
-  let txs = db.transactions.filter(t => !t.isRecurring);
+  // Toutes les transactions (récurrentes incluses)
+  let txs = db.transactions.slice();
 
   // Filtre jambe entrante des virements (évite doublon)
   txs = txs.filter(t => !(t.isTransfer && t.id.endsWith('_in')));
@@ -2482,17 +2546,33 @@ function renderOperations() {
         ? `${t.date} · ${acc?acc.name:'?'} → ${toAcc?toAcc.name:'?'}`
         : `${t.date} · ${acc?acc.name:'?'} · ${cat.label}`;
 
-      const today   = new Date().toISOString().substring(0,10);
-      const isFuture = t.date > today;
+      const todayStr = new Date().toISOString().substring(0,10);
+      const isFuture = t.date > todayStr;
       const futureStyle = isFuture
         ? 'opacity:.55;font-style:italic;background:repeating-linear-gradient(135deg,transparent,transparent 6px,rgba(255,255,255,.015) 6px,rgba(255,255,255,.015) 12px)'
         : '';
 
-      return `<div class="tx-item" style="${futureStyle}">
+      // Pointage : checkbox uniquement sur les récurrentes passées (pas futures, pas les manuelles)
+      const showPointing = t.isRecurring && !isFuture && !(t.isTransfer && t.id.endsWith('_out'));
+      const isPointed = !t.unpointed;
+      const unpointedStyle = (showPointing && !isPointed) ? 'opacity:.5;' : '';
+
+      const recBadge = t.isRecurring ? ' · <span style="color:var(--orange);font-style:normal;font-size:10px;font-weight:600">🔄 récurrent</span>' : '';
+      const pointingBtn = showPointing ? `
+        <label title="${isPointed ? 'Comptabilisé en banque — cliquer pour exclure' : 'Non comptabilisé en banque — cliquer pour inclure'}"
+          style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;margin-top:3px" onclick="event.stopPropagation();toggleTransactionPointing('${t.id}')">
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;border:1.5px solid ${isPointed?'var(--green)':'var(--border)'};background:${isPointed?'var(--green)':'transparent'};flex-shrink:0;transition:all .15s">
+            ${isPointed?'<svg width="10" height="10" viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}
+          </span>
+          <span style="font-size:10px;color:${isPointed?'var(--green)':'var(--muted)'};">${isPointed?'Comptabilisé en banque':'Non comptabilisé en banque'}</span>
+        </label>` : '';
+
+      return `<div class="tx-item" style="${futureStyle}${unpointedStyle}">
         <div class="tx-icon" style="background:${bgCol};font-size:${isT?'16px':'18px'}">${icon}</div>
         <div class="tx-info">
           <div class="tx-name">${t.label}</div>
-          <div class="tx-sub">${sub}${isFuture ? ' · <span style="color:var(--accent2);font-style:normal;font-size:10px;font-weight:600">À VENIR</span>' : ''}</div>
+          <div class="tx-sub">${sub}${isFuture ? ' · <span style="color:var(--accent2);font-style:normal;font-size:10px;font-weight:600">À VENIR</span>' : ''}${recBadge}</div>
+          ${pointingBtn}
         </div>
         <div style="text-align:right">
           <div class="tx-amount" style="color:${amtCol}">${prefix}${fmt(t.amount)}</div>
@@ -3495,7 +3575,8 @@ function transactionToRow(t) {
     transfer_from:t.transferFrom || null,
     transfer_to:  t.transferTo || null,
     is_recurring: t.isRecurring || false,
-    recurring_id: t.recurringId || null
+    recurring_id: t.recurringId || null,
+    is_unpointed: t.unpointed || false
   };
 }
 function rowToTransaction(r) {
@@ -3512,7 +3593,8 @@ function rowToTransaction(r) {
     transferFrom:r.transfer_from,
     transferTo:  r.transfer_to,
     isRecurring: r.is_recurring,
-    recurringId: r.recurring_id
+    recurringId: r.recurring_id,
+    unpointed:   r.is_unpointed || false
   };
 }
 

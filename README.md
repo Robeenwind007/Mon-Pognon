@@ -1,107 +1,136 @@
-# 💰 AutoThunes — Mon-Pognon
+# AutoThunes — v2.1.7
 
-> Gestion du pognon et des comptes par OBE
-
-Application web de gestion financière personnelle, hébergée en tant que PWA sur GitHub Pages.  
-Architecture : fichier unique `index.html` · Base de données : Supabase · Version : **v2.1.5**
+Gestionnaire de finances personnelles sous forme de PWA single-file, développé par OBE.
 
 ---
 
-## 🚀 Accès
+## Présentation
 
-**URL** : [https://robeenwind007.github.io/Mon-Pognon/](https://robeenwind007.github.io/Mon-Pognon/)
+AutoThunes est une application web progressive (PWA) autonome — un seul fichier `index.html` — conçue pour gérer comptes bancaires, transactions, charges récurrentes, prêts et placements (PEA). Les données sont synchronisées avec un backend Supabase et mises en cache localement via `localStorage`.
 
 ---
 
-## 📋 Fonctionnalités
-
-### Tableau de bord
-- Solde réel et théorique global ou par compte
-- Carte synthèse des prêts actifs
-- **5 dernières opérations** (transactions manuelles + récurrentes) avec logo du compte
-- 5 prochaines opérations récurrentes à venir avec comptabilisation
-
-### Opérations (Saisie)
-- Ajout rapide : dépense / recette / virement
-- **Type par défaut : Dépense** à chaque ouverture du formulaire
-- Logo du compte dans le sous-texte de chaque ligne
-- Groupement par mois avec total mensuel
-- Filtres par compte et par type
-- Badge `🔄 récurrent` pour les opérations issues des récurrentes
-- Modification et suppression
-
-### Statistiques
-- Sélection de période : semaine / mois / trimestre / année
-- Filtre par compte
-- Graphique donut par catégorie
-- Histogramme 6 mois revenus/dépenses
-- **Détail par catégorie dépliable** : clic sur une catégorie pour voir chaque opération individuelle (label, date, compte, montant)
-
-### Opérations récurrentes
-- Charges, produits, virements récurrents
-- Toggle actif/inactif
-- Date de début paramétrable
-- Logo du compte dans la liste
-- Total charges actives, total produits actifs, solde récurrent net du mois
-
-### Prêts
-- Suivi capital restant, mensualités, assurance
-- Barre de progression
-- Taux annuel approximatif
-- Fin estimée
-- Logo du compte dans les cartes prêt
+## Fonctionnalités principales
 
 ### Comptes
-- Création avec emoji ou image personnalisée (base64)
-- Types : courant, épargne, livret, investissement…
-- Solde réel / théorique
+- Création de comptes avec icône personnalisée (PNG/JPEG/WEBP stocké en base64)
+- Types : courant, épargne, PEA, crédit
+- Solde initial paramétrable
+- Inclusion/exclusion du solde global
+- Solde réel affiché sur le dashboard
+- Solde projeté fin de mois (récurrentes + opérations futures incluses)
 
-### Réglages
-- Thème **Sombre / Clair / Système** — appliqué à tous les onglets en temps réel
-- Catégories personnalisables
-- Synchronisation Supabase
+### Transactions
+- Saisie manuelle de dépenses, recettes et virements
+- Catégorisation par icône et couleur
+- Étiquettes libres (labels) avec auto-complétion
+- Transactions futures affichées en italique avec badge « À VENIR »
+- Groupement par mois dans l'onglet Opérations
+- Modification et suppression
+
+### Charges récurrentes
+- Définition d'une charge, recette ou virement mensuel avec jour de prélèvement
+- Application automatique au dépassement du jour prévu (`applyRecurringIfNeeded`)
+- Activation/désactivation par toggle
+- Date de démarrage optionnelle (`startMonthKey`)
+- **⚡ Comptabilisation par anticipation** : bouton sur les récurrentes non encore appliquées ce mois, pour forcer la comptabilisation au jour actuel (cas d'un prélèvement en avance sur le calendrier)
+- Badge `🔄 récurrent` sur les lignes de l'onglet Opérations
+
+### Pointage bancaire
+- Chaque transaction récurrente passée affiche une checkbox **Comptabilisé en banque** (cochée par défaut)
+- Décocher exclut la transaction du solde réel (`accountBalance`) — utile quand l'écriture est dans l'app mais pas encore passée en banque
+- L'état est persisté en local et synchronisé en Supabase (`is_unpointed`)
+- Pour les virements récurrents, les deux jambes sont synchronisées ensemble
+
+### Prêts
+- Suivi d'un prêt avec capital, taux, durée
+- Génération automatique d'une récurrente mensuelle associée
+- Tableau d'amortissement
+
+### PEA / Placements
+- Suivi des lignes de portefeuille avec prix d'achat et quantité
+- Cotation en temps réel via Finnhub (clé API configurable)
+- Valorisation et plus/moins-value affichées
+
+### Dashboard
+- Solde réel et solde fin de mois par compte
+- Prochaines opérations à venir (récurrentes actives du mois)
+- Solde récurrent net (charges et produits restant ce mois)
+
+### Stats
+- Graphique donut par catégorie de dépenses
+- Graphique barre mensuel par compte
+- Navigation par mois, trimestre ou année
 
 ---
 
-## 🎨 Thèmes
+## Architecture technique
 
-| Mode | Description |
-|------|-------------|
-| 🌙 Sombre | Thème dark par défaut |
-| ☀️ Clair | Fond clair, texte sombre |
-| ⚙️ Système | Suit la préférence OS |
+| Aspect | Détail |
+|---|---|
+| Format | Single-file HTML PWA |
+| Stockage local | `localStorage` (cache) |
+| Backend | Supabase (PostgreSQL) |
+| Sync | Push dirty records + Pull complet au démarrage |
+| UI Framework | Vanilla JS + CSS custom properties |
+| Polices | DM Sans, DM Mono (Google Fonts) |
 
-Le thème s'applique immédiatement à **tous les onglets** lors du changement.
+### Supabase
+
+URL projet : `https://nqhcphhxdwqksgxcrafh.supabase.co`
+
+Tables utilisées :
+
+```
+accounts
+transactions
+recurring_charges
+recurring_applied
+loans
+categories
+labels
+holdings
+```
+
+#### Migration requise (v2.1.6+)
+
+Ajouter la colonne de pointage bancaire sur les transactions :
+
+```sql
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS is_unpointed boolean DEFAULT false;
+```
 
 ---
 
-## 🗂️ Historique des versions
+## Historique des versions
 
-| Version | Date | Changements |
-|---------|------|-------------|
-| **v2.1.5** | 2026-03-06 | Fix icônes base64 dans selects/formulaires édition · 5 dernières opérations sur tableau de bord incluant récurrentes · Détail par catégorie dépliable dans Stats · Type "Dépense" par défaut à l'ouverture du formulaire · Thème appliqué à tous les onglets · Fix bottom-nav en mode clair · Logo compte dans les opérations |
-| v2.1.4 | 2026-03 | Logo compte dans les opérations (Tableau, Saisie, À venir) · Fix icônes base64 prêts et Tableau |
-| v2.1.3 | 2026-03 | Fix icônes base64 dans la liste des récurrentes |
-| v2.0.0 | 2026-03 | Suppression onglet PEA · Tagline splash screen · Nettoyage dépôt |
-| v1.x | — | Versions initiales |
+### v2.1.7
+- Libellé du pointage renommé : **Comptabilisé en banque** / **Non comptabilisé en banque**
+
+### v2.1.6
+- **Pointage bancaire** : checkbox sur chaque transaction récurrente passée pour l'inclure/exclure du solde réel
+- Ajout du champ `is_unpointed` dans la synchronisation Supabase
+- Les virements récurrents synchronisent les deux jambes ensemble
+
+### v2.1.5
+- **Opérations récurrentes visibles** dans l'onglet Opérations (bug : filtre `!isRecurring` retiré)
+- Badge `🔄 récurrent` sur les lignes concernées
+- **Bouton ⚡ Comptabiliser maintenant** sur les récurrentes non appliquées ce mois (onglet Récurrentes)
+- Statut basé sur `applied[]` plutôt que sur le seul jour calendaire
+
+### v2.1.4 et antérieures
+- Mise en place de l'architecture Supabase normalisée
+- Gestion des prêts avec récurrente auto-générée
+- PEA avec cotations Finnhub
+- Icônes de compte en base64
+- Transactions récurrentes inline avec badge 🔄 et style italique
+- Onglet dédié Récurrentes dans la nav
+- Solde projeté fin de mois
 
 ---
 
-## 🛠️ Déploiement
+## Déploiement
 
-1. Générer / modifier `index.html`
-2. Renommer en `index.html`
-3. Uploader via l'interface web GitHub dans le dépôt `Robeenwind007/Mon-Pognon`
-4. GitHub Pages publie automatiquement
+L'application se déploie en copiant `index.html` sur n'importe quel hébergement statique (GitHub Pages, Netlify, etc.). Aucune dépendance serveur.
 
----
-
-## 🗄️ Stack technique
-
-| Composant | Technologie |
-|-----------|-------------|
-| Frontend | HTML5 · CSS3 · Vanilla JS (ES6+) |
-| Police | Sora · DM Mono (Google Fonts) |
-| Base de données | Supabase (PostgreSQL) |
-| Hébergement | GitHub Pages |
-| Mode PWA | `manifest.json` + Service Worker |
+La clé Supabase anon est intégrée dans le fichier. La synchronisation démarre automatiquement au chargement si une session utilisateur est active.
