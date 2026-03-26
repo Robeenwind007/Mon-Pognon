@@ -1036,7 +1036,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '2.1.7';
+const APP_VERSION = '2.1.10';
 
 // Render account icon: image if base64, emoji otherwise
 function iconHTML(icon, size='26px') {
@@ -1326,12 +1326,15 @@ function accountMonthBalance(accId) {
   );
 
   // Charges récurrentes en attente (expense, hors virements)
+  // Récurrente "en attente" = future OU du jour mais pas encore pointée (en suspens)
+  const isPending = (r) => r.day > todayDay || (r.day === todayDay && !(r.pointed && r.pointed[monthKey]));
+
   const pendingCharges = db.recurringCharges.filter(r=>{
     if(r.active === false) return false;
     if(r.accountId !== accId) return false;
     if(r.type === 'transfer' || r.type === 'income') return false;
     if(!isRecurringStarted(r, monthKey)) return false;
-    return r.day > todayDay;
+    return isPending(r);
   });
 
   // Produits récurrents en attente (income)
@@ -1339,7 +1342,7 @@ function accountMonthBalance(accId) {
     if(r.active === false) return false;
     if(r.accountId !== accId || r.type !== 'income') return false;
     if(!isRecurringStarted(r, monthKey)) return false;
-    return r.day > todayDay;
+    return isPending(r);
   });
 
   // Virements sortants en attente
@@ -1347,7 +1350,7 @@ function accountMonthBalance(accId) {
     if(r.active === false) return false;
     if(r.accountId !== accId || r.type !== 'transfer') return false;
     if(!isRecurringStarted(r, monthKey)) return false;
-    return r.day > todayDay;
+    return isPending(r);
   });
 
   // Virements entrants en attente
@@ -1355,7 +1358,7 @@ function accountMonthBalance(accId) {
     if(r.active === false) return false;
     if(r.toAccountId !== accId || r.type !== 'transfer') return false;
     if(!isRecurringStarted(r, monthKey)) return false;
-    return r.day > todayDay;
+    return isPending(r);
   });
 
   const pendingOut = pendingCharges.reduce((s,r)=>s+r.amount,0)
@@ -1415,6 +1418,8 @@ function applyRecurringIfNeeded() {
       markDirty('transactions', tx.id);
     }
     r.applied.push(monthKey);
+    if(!r.pointed) r.pointed = {};
+    r.pointed[monthKey] = true;
     markDirty('recurring', r.id);
     _dirty.newApplied.push({ recurring_charge_id: r.id, month_key: monthKey });
   });
@@ -1580,6 +1585,11 @@ function togglePointed(id) {
   const now = new Date();
   const monthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   if(!r.pointed) r.pointed = {};
+  // Si déjà appliquée (transaction créée), on ne peut pas décocher — ce serait un double comptage
+  if(r.pointed[monthKey] && r.applied && r.applied.includes(monthKey)) {
+    showToast('Déjà comptabilisée en banque — impossible de décocher');
+    return;
+  }
   r.pointed[monthKey] = !r.pointed[monthKey];
   markDirty('recurring', r.id);
   save(); renderDashboard();
@@ -1926,6 +1936,22 @@ function toggleTransactionPointing(id) {
     const partner = db.transactions.find(x=>x.transferId===t.transferId && x.id!==t.id);
     if(partner) { partner.unpointed = t.unpointed; markDirty('transactions', partner.id); }
   }
+  // Si c'est une transaction récurrente, synchroniser r.pointed sur la récurrente parente
+  // ID format : rec-{recurringId}-{monthKey}  ex: rec-abc123-2025-03
+  if(t.isRecurring && t.id.startsWith('rec-')) {
+    const parts = t.id.match(/^rec-(.+)-(\d{4}-\d{2})(?:_out|_in)?$/);
+    if(parts) {
+      const recurringId = parts[1];
+      const monthKey    = parts[2];
+      const r = db.recurringCharges.find(r=>r.id===recurringId);
+      if(r) {
+        if(!r.pointed) r.pointed = {};
+        // pointed = true si comptabilisée (unpointed=false), false si exclue (unpointed=true)
+        r.pointed[monthKey] = !t.unpointed;
+        markDirty('recurring', r.id);
+      }
+    }
+  }
   save();
   refreshAll();
 }
@@ -1968,6 +1994,8 @@ function forceApplyRecurring(id) {
     markDirty('transactions', tx.id);
   }
   r.applied.push(monthKey);
+  if(!r.pointed) r.pointed = {};
+  r.pointed[monthKey] = true;
   markDirty('recurring', r.id);
   _dirty.newApplied.push({ recurring_charge_id: r.id, month_key: monthKey });
   save();
@@ -2137,11 +2165,12 @@ function renderRecurring() {
   const totalCharges = list.filter(r=>r.type==='expense' && r.active!==false).reduce((s,r)=>s+r.amount,0);
   const totalIncomes = list.filter(r=>r.type==='income'  && r.active!==false).reduce((s,r)=>s+r.amount,0);
 
-  // SOLDE RÉCURRENT NET = actives filtrées dont le jour est > aujourd'hui (reste du mois)
+  // SOLDE RÉCURRENT NET = actives filtrées dont le jour est > aujourd'hui OU du jour non pointé (reste du mois)
   const now2 = new Date();
   const curMonthKey = `${now2.getFullYear()}-${String(now2.getMonth()+1).padStart(2,'0')}`;
-  const netCharges = list.filter(r=>r.type==='expense' && r.active!==false && r.day>todayDay && db.accounts.find(a=>a.id===r.accountId)?.includeInTotal!==false && !(r.pointed && r.pointed[curMonthKey]) && isRecurringStarted(r, curMonthKey)).reduce((s,r)=>s+r.amount,0);
-  const netIncomes = list.filter(r=>r.type==='income'  && r.active!==false && r.day>todayDay && db.accounts.find(a=>a.id===r.accountId)?.includeInTotal!==false && !(r.pointed && r.pointed[curMonthKey]) && isRecurringStarted(r, curMonthKey)).reduce((s,r)=>s+r.amount,0);
+  const isCurPending = (r) => r.day > todayDay || (r.day === todayDay && !(r.pointed && r.pointed[curMonthKey]));
+  const netCharges = list.filter(r=>r.type==='expense' && r.active!==false && isCurPending(r) && db.accounts.find(a=>a.id===r.accountId)?.includeInTotal!==false && !(r.pointed && r.pointed[curMonthKey]) && isRecurringStarted(r, curMonthKey)).reduce((s,r)=>s+r.amount,0);
+  const netIncomes = list.filter(r=>r.type==='income'  && r.active!==false && isCurPending(r) && db.accounts.find(a=>a.id===r.accountId)?.includeInTotal!==false && !(r.pointed && r.pointed[curMonthKey]) && isRecurringStarted(r, curMonthKey)).reduce((s,r)=>s+r.amount,0);
   const netBalance = netIncomes - netCharges;
 
   // Trier : produits d'abord, puis charges, puis virements — puis par jour
@@ -2266,16 +2295,17 @@ function renderDashboard() {
   const totalReal  = db.accounts.filter(a=>a.includeInTotal!==false).reduce((s,a)=>s+accountBalance(a.id),0);
   const totalMonth = db.accounts.filter(a=>a.includeInTotal!==false).reduce((s,a)=>s+accountMonthBalance(a.id),0);
 
-  // Opérations récurrentes restantes ce mois (jour > aujourd'hui, actives uniquement)
+  // Opérations récurrentes restantes ce mois (jour > aujourd'hui OU du jour non pointé, actives uniquement)
   const dashMonthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  const pendingCharges = db.recurringCharges.filter(r=>r.active!==false && r.type==='expense' && r.day>todayDay && !(r.pointed && r.pointed[dashMonthKey]) && db.accounts.find(a=>a.id===r.accountId)?.includeInTotal!==false && isRecurringStarted(r, dashMonthKey));
-  const pendingIncomes = db.recurringCharges.filter(r=>r.active!==false && r.type==='income'  && r.day>todayDay && !(r.pointed && r.pointed[dashMonthKey]) && db.accounts.find(a=>a.id===r.accountId)?.includeInTotal!==false && isRecurringStarted(r, dashMonthKey));
+  const isDashPending = (r) => r.day > todayDay || (r.day === todayDay && !(r.pointed && r.pointed[dashMonthKey]));
+  const pendingCharges = db.recurringCharges.filter(r=>r.active!==false && r.type==='expense' && isDashPending(r) && !(r.pointed && r.pointed[dashMonthKey]) && db.accounts.find(a=>a.id===r.accountId)?.includeInTotal!==false && isRecurringStarted(r, dashMonthKey));
+  const pendingIncomes = db.recurringCharges.filter(r=>r.active!==false && r.type==='income'  && isDashPending(r) && !(r.pointed && r.pointed[dashMonthKey]) && db.accounts.find(a=>a.id===r.accountId)?.includeInTotal!==false && isRecurringStarted(r, dashMonthKey));
   const totalPendingOut = pendingCharges.reduce((s,r)=>s+r.amount,0);
   const totalPendingIn  = pendingIncomes.reduce((s,r)=>s+r.amount,0);
   const totalPending    = totalPendingOut - totalPendingIn; // net
 
   // Prochain événement récurrent à venir (charge ou produit, actif)
-  const pendingAll  = db.recurringCharges.filter(r=>r.active!==false && r.type!=='transfer' && r.day>todayDay && !(r.pointed && r.pointed[dashMonthKey]) && isRecurringStarted(r, dashMonthKey));
+  const pendingAll  = db.recurringCharges.filter(r=>r.active!==false && r.type!=='transfer' && isDashPending(r) && !(r.pointed && r.pointed[dashMonthKey]) && isRecurringStarted(r, dashMonthKey));
   const nextCharge  = [...pendingAll].sort((a,b)=>a.day-b.day)[0];
 
   document.getElementById('total-real').textContent  = fmt(totalReal);
@@ -2302,12 +2332,14 @@ function renderDashboard() {
       const month = accountMonthBalance(a.id);
       const typeInfo = ACCOUNT_TYPES[a.type] || { label: a.type||'', icon: a.icon };
 
-      // Opérations récurrentes encore à venir ce mois pour ce compte
+      // Opérations récurrentes encore à venir ce mois pour ce compte (future OU du jour non pointée)
+      const accMonthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+      const isAccPending = (r) => r.day > todayDay || (r.day === todayDay && !(r.pointed && r.pointed[accMonthKey]));
       const accPendingCharges = db.recurringCharges.filter(r=>
-        r.accountId===a.id && r.type==='expense' && r.day>todayDay
+        r.accountId===a.id && r.type==='expense' && isAccPending(r)
       );
       const accPendingIncomes = db.recurringCharges.filter(r=>
-        r.accountId===a.id && r.type==='income' && r.day>todayDay
+        r.accountId===a.id && r.type==='income' && isAccPending(r)
       );
       const pendingChargeAmt = accPendingCharges.reduce((s,r)=>s+r.amount,0);
       const pendingIncomeAmt = accPendingIncomes.reduce((s,r)=>s+r.amount,0);
@@ -2431,13 +2463,14 @@ function renderDashboard() {
     }).filter(Boolean).join('');
   }
 
-  // 5 prochaines opérations à venir (récurrentes actives dont le jour > aujourd'hui)
+  // 5 prochaines opérations à venir (récurrentes actives dont le jour > aujourd'hui OU du jour non pointé)
   const yr  = now.getFullYear();
   const mo  = String(now.getMonth()+1).padStart(2,'0');
   const monthKey = `${yr}-${mo}`;
 
   const upcoming = db.recurringCharges
-    .filter(r => r.active !== false && r.day > todayDay && isRecurringStarted(r, monthKey))
+    .filter(r => r.active !== false && isRecurringStarted(r, monthKey) &&
+      (r.day > todayDay || (r.day === todayDay && !(r.pointed && r.pointed[monthKey]))))
     .sort((a,b) => a.day - b.day)
     .slice(0, 5);
 

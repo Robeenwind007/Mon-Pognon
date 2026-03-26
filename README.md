@@ -1,136 +1,143 @@
-# AutoThunes — v2.1.7
+# AutoThunes — v2.1.10
 
-Gestionnaire de finances personnelles sous forme de PWA single-file, développé par OBE.
-
----
-
-## Présentation
-
-AutoThunes est une application web progressive (PWA) autonome — un seul fichier `index.html` — conçue pour gérer comptes bancaires, transactions, charges récurrentes, prêts et placements (PEA). Les données sont synchronisées avec un backend Supabase et mises en cache localement via `localStorage`.
+PWA de gestion financière personnelle. Application mono-fichier `index.html`, déployée sur GitHub Pages, avec synchronisation Supabase.
 
 ---
 
-## Fonctionnalités principales
+## Stack technique
 
-### Comptes
-- Création de comptes avec icône personnalisée (PNG/JPEG/WEBP stocké en base64)
-- Types : courant, épargne, PEA, crédit
-- Solde initial paramétrable
-- Inclusion/exclusion du solde global
-- Solde réel affiché sur le dashboard
-- Solde projeté fin de mois (récurrentes + opérations futures incluses)
-
-### Transactions
-- Saisie manuelle de dépenses, recettes et virements
-- Catégorisation par icône et couleur
-- Étiquettes libres (labels) avec auto-complétion
-- Transactions futures affichées en italique avec badge « À VENIR »
-- Groupement par mois dans l'onglet Opérations
-- Modification et suppression
-
-### Charges récurrentes
-- Définition d'une charge, recette ou virement mensuel avec jour de prélèvement
-- Application automatique au dépassement du jour prévu (`applyRecurringIfNeeded`)
-- Activation/désactivation par toggle
-- Date de démarrage optionnelle (`startMonthKey`)
-- **⚡ Comptabilisation par anticipation** : bouton sur les récurrentes non encore appliquées ce mois, pour forcer la comptabilisation au jour actuel (cas d'un prélèvement en avance sur le calendrier)
-- Badge `🔄 récurrent` sur les lignes de l'onglet Opérations
-
-### Pointage bancaire
-- Chaque transaction récurrente passée affiche une checkbox **Comptabilisé en banque** (cochée par défaut)
-- Décocher exclut la transaction du solde réel (`accountBalance`) — utile quand l'écriture est dans l'app mais pas encore passée en banque
-- L'état est persisté en local et synchronisé en Supabase (`is_unpointed`)
-- Pour les virements récurrents, les deux jambes sont synchronisées ensemble
-
-### Prêts
-- Suivi d'un prêt avec capital, taux, durée
-- Génération automatique d'une récurrente mensuelle associée
-- Tableau d'amortissement
-
-### PEA / Placements
-- Suivi des lignes de portefeuille avec prix d'achat et quantité
-- Cotation en temps réel via Finnhub (clé API configurable)
-- Valorisation et plus/moins-value affichées
-
-### Dashboard
-- Solde réel et solde fin de mois par compte
-- Prochaines opérations à venir (récurrentes actives du mois)
-- Solde récurrent net (charges et produits restant ce mois)
-
-### Stats
-- Graphique donut par catégorie de dépenses
-- Graphique barre mensuel par compte
-- Navigation par mois, trimestre ou année
-
----
-
-## Architecture technique
-
-| Aspect | Détail |
+| Élément | Détail |
 |---|---|
-| Format | Single-file HTML PWA |
-| Stockage local | `localStorage` (cache) |
-| Backend | Supabase (PostgreSQL) |
-| Sync | Push dirty records + Pull complet au démarrage |
-| UI Framework | Vanilla JS + CSS custom properties |
-| Polices | DM Sans, DM Mono (Google Fonts) |
-
-### Supabase
-
-URL projet : `https://nqhcphhxdwqksgxcrafh.supabase.co`
-
-Tables utilisées :
-
-```
-accounts
-transactions
-recurring_charges
-recurring_applied
-loans
-categories
-labels
-holdings
-```
-
-#### Migration requise (v2.1.6+)
-
-Ajouter la colonne de pointage bancaire sur les transactions :
-
-```sql
-ALTER TABLE transactions ADD COLUMN IF NOT EXISTS is_unpointed boolean DEFAULT false;
-```
+| Format | Single-file HTML (CSS + JS inline) |
+| Hébergement | GitHub Pages |
+| Backend | Supabase (PostgreSQL + REST API) |
+| Police | Sora / DM Mono (Google Fonts) |
+| PWA | Manifest + icône Apple Touch, standalone |
 
 ---
 
-## Historique des versions
+## Structure Supabase
 
-### v2.1.7
-- Libellé du pointage renommé : **Comptabilisé en banque** / **Non comptabilisé en banque**
+Cinq tables principales chargées en parallèle au démarrage :
 
-### v2.1.6
-- **Pointage bancaire** : checkbox sur chaque transaction récurrente passée pour l'inclure/exclure du solde réel
-- Ajout du champ `is_unpointed` dans la synchronisation Supabase
-- Les virements récurrents synchronisent les deux jambes ensemble
+| Table | Rôle |
+|---|---|
+| `accounts` | Comptes bancaires (solde initial, type, icône, ordre) |
+| `transactions` | Opérations manuelles et récurrentes générées |
+| `recurring_charges` | Définitions des charges/produits/virements récurrents |
+| `categories` | Catégories custom (en plus des catégories système) |
+| `labels` | Libellés sauvegardés avec compteur d'usage |
 
-### v2.1.5
-- **Opérations récurrentes visibles** dans l'onglet Opérations (bug : filtre `!isRecurring` retiré)
-- Badge `🔄 récurrent` sur les lignes concernées
-- **Bouton ⚡ Comptabiliser maintenant** sur les récurrentes non appliquées ce mois (onglet Récurrentes)
-- Statut basé sur `applied[]` plutôt que sur le seul jour calendaire
+Relations : `transactions.accountId → accounts.id` (ON DELETE CASCADE), idem pour `recurring_charges`.
 
-### v2.1.4 et antérieures
-- Mise en place de l'architecture Supabase normalisée
-- Gestion des prêts avec récurrente auto-générée
-- PEA avec cotations Finnhub
-- Icônes de compte en base64
-- Transactions récurrentes inline avec badge 🔄 et style italique
-- Onglet dédié Récurrentes dans la nav
-- Solde projeté fin de mois
+---
+
+## Navigation (5 onglets)
+
+| Onglet | Rôle |
+|---|---|
+| **Tableau** | Dashboard global + liste des comptes avec EN COURS / FIN DE MOIS |
+| **Opérations** | Saisie et historique des transactions par compte et par mois |
+| **Stats** | Graphiques par catégorie et période |
+| **Récurrentes** | Gestion des charges/produits/virements récurrents |
+| **Paramètres** | Comptes, thème, import/export, backup JSON |
+
+---
+
+## Types de comptes
+
+`courant` 🏦 · `pel` 🏠 · `ldd` 🌱 · `livreta` 📗 · `pea` 📈 · `lld` 🚗 · `carte` 💳
+
+---
+
+## Logique des soldes
+
+### Solde à date (`accountBalance`)
+Solde initial + toutes les transactions dont `date ≤ aujourd'hui` et `unpointed = false`.
+
+### Solde fin de mois (`accountMonthBalance`)
+Solde à date + opérations manuelles futures du mois + récurrentes **en attente**.
+
+**Définition "en attente"** (`isPending`) :
+```js
+r.day > todayDay
+|| (r.day === todayDay && !(r.pointed && r.pointed[monthKey]))
+```
+Une récurrente du jour est en attente si elle n'est pas encore pointée (= pas encore en banque).
+
+### EN COURS (différence dans Tableau > compte)
+`FIN DE MOIS − SOLDE À DATE` = somme nette des récurrentes encore en attente ce mois.
+
+---
+
+## Récurrentes — cycle de vie
+
+```
+Créée → active, non pointée
+   │
+   ├─ Jour non encore arrivé     → dans les pending (compte dans FIN DE MOIS)
+   │
+   ├─ Jour = aujourd'hui
+   │     ├─ Non pointée          → dans les pending (en suspens)
+   │     └─ Pointée              → hors pending
+   │
+   └─ Jour passé
+         ├─ applied = false      → applyRecurringIfNeeded() crée la transaction
+         │                          + pointed[monthKey] = true
+         └─ applied = true       → transaction déjà créée, pointed = true
+```
+
+### Pointage (`r.pointed[monthKey]`)
+- `false` ou absent : récurrente **en attente**, comptée dans FIN DE MOIS
+- `true` : récurrente **passée**, exclue des pending (la transaction est dans le solde réel)
+
+### Mise à jour du pointage
+| Action | Effet |
+|---|---|
+| `forceApplyRecurring()` — "Comptabiliser maintenant" | Crée la transaction + `pointed = true` + `applied.push()` |
+| `applyRecurringIfNeeded()` — auto au démarrage | Crée la transaction + `pointed = true` + `applied.push()` |
+| `togglePointed()` — case à cocher dans Récurrentes | Bascule `pointed` (bloqué si déjà `applied`) |
+| `toggleTransactionPointing()` — "Comptabilisé en banque" dans Opérations | `unpointed` sur la transaction + remonte sur `r.pointed` via ID `rec-{id}-{monthKey}` |
+
+---
+
+## Format des IDs de transactions récurrentes
+
+```
+rec-{recurringId}-{YYYY-MM}          → charge / produit
+rec-{recurringId}-{YYYY-MM}_out      → virement sortant
+rec-{recurringId}-{YYYY-MM}_in       → virement entrant
+```
+
+Ce format permet à `toggleTransactionPointing` de retrouver la récurrente parente et de synchroniser `pointed`.
+
+---
+
+## Thèmes
+
+Trois thèmes CSS via variables `:root` :
+
+| Classe | Mode |
+|---|---|
+| *(défaut)* | Sombre |
+| `.theme-light` | Clair |
+| `.theme-system` | Suit `prefers-color-scheme` |
 
 ---
 
 ## Déploiement
 
-L'application se déploie en copiant `index.html` sur n'importe quel hébergement statique (GitHub Pages, Netlify, etc.). Aucune dépendance serveur.
+1. Modifier `index.html`
+2. Incrémenter `APP_VERSION` (constante JS)
+3. Pousser sur la branche GitHub Pages
+4. *(optionnel)* Mettre à jour `README.md`
 
-La clé Supabase anon est intégrée dans le fichier. La synchronisation démarre automatiquement au chargement si une session utilisateur est active.
+---
+
+## Historique des versions récentes
+
+| Version | Changement |
+|---|---|
+| 2.1.10 | `toggleTransactionPointing` synchronise `r.pointed` sur la récurrente parente → supprime le double comptage lors du pointage depuis Opérations |
+| 2.1.9 | `forceApplyRecurring` et `applyRecurringIfNeeded` posent `pointed = true` ; `togglePointed` bloqué si déjà `applied` |
+| 2.1.8 | Correction `isPending` : récurrentes du jour non pointées incluses dans les calculs FIN DE MOIS et EN COURS |
