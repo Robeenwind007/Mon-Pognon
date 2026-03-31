@@ -1,143 +1,149 @@
-# AutoThunes — v2.1.10
-
-PWA de gestion financière personnelle. Application mono-fichier `index.html`, déployée sur GitHub Pages, avec synchronisation Supabase.
+# AutoThunes
+## Documentation technique v2.1.14
 
 ---
 
-## Stack technique
+## Présentation
 
-| Élément | Détail |
+AutoThunes est une Progressive Web App (PWA) de gestion financière personnelle, single-file `index.html`, déployée sur GitHub Pages avec Supabase comme backend. Pas de framework, pas de build.
+
+---
+
+## Architecture
+
+| Élément | Technologie |
 |---|---|
-| Format | Single-file HTML (CSS + JS inline) |
-| Hébergement | GitHub Pages |
-| Backend | Supabase (PostgreSQL + REST API) |
-| Police | Sora / DM Mono (Google Fonts) |
-| PWA | Manifest + icône Apple Touch, standalone |
+| Frontend | HTML/CSS/JS vanilla, single-file |
+| Backend | Supabase (PostgreSQL) |
+| Déploiement | GitHub Pages |
+| Persistance locale | localStorage (cache offline) |
 
 ---
 
 ## Structure Supabase
 
-Cinq tables principales chargées en parallèle au démarrage :
+### Tables
 
 | Table | Rôle |
 |---|---|
-| `accounts` | Comptes bancaires (solde initial, type, icône, ordre) |
-| `transactions` | Opérations manuelles et récurrentes générées |
-| `recurring_charges` | Définitions des charges/produits/virements récurrents |
-| `categories` | Catégories custom (en plus des catégories système) |
-| `labels` | Libellés sauvegardés avec compteur d'usage |
+| `accounts` | Comptes bancaires (name, icon, type, initial_balance, include_in_total, sort_order, **closed**) |
+| `transactions` | Opérations (label, amount, type, date, category, account_id, transfer_id…) |
+| `recurring_charges` | Charges récurrentes (label, amount, day, type, account_id, loan_id, active…) |
+| `recurring_applied` | Mois où une récurrente a été comptabilisée (recurring_charge_id, month_key) |
+| `loans` | Prêts (label, amount, duration, monthly, insurance, start, first_payment…) |
+| `categories` | Catégories custom |
+| `labels` | Labels fréquents |
+| `holdings` | PEA — positions (optionnel, table peut être absente) |
 
-Relations : `transactions.accountId → accounts.id` (ON DELETE CASCADE), idem pour `recurring_charges`.
+### Migrations nécessaires
 
----
-
-## Navigation (5 onglets)
-
-| Onglet | Rôle |
-|---|---|
-| **Tableau** | Dashboard global + liste des comptes avec EN COURS / FIN DE MOIS |
-| **Opérations** | Saisie et historique des transactions par compte et par mois |
-| **Stats** | Graphiques par catégorie et période |
-| **Récurrentes** | Gestion des charges/produits/virements récurrents |
-| **Paramètres** | Comptes, thème, import/export, backup JSON |
-
----
-
-## Types de comptes
-
-`courant` 🏦 · `pel` 🏠 · `ldd` 🌱 · `livreta` 📗 · `pea` 📈 · `lld` 🚗 · `carte` 💳
-
----
-
-## Logique des soldes
-
-### Solde à date (`accountBalance`)
-Solde initial + toutes les transactions dont `date ≤ aujourd'hui` et `unpointed = false`.
-
-### Solde fin de mois (`accountMonthBalance`)
-Solde à date + opérations manuelles futures du mois + récurrentes **en attente**.
-
-**Définition "en attente"** (`isPending`) :
-```js
-r.day > todayDay
-|| (r.day === todayDay && !(r.pointed && r.pointed[monthKey]))
-```
-Une récurrente du jour est en attente si elle n'est pas encore pointée (= pas encore en banque).
-
-### EN COURS (différence dans Tableau > compte)
-`FIN DE MOIS − SOLDE À DATE` = somme nette des récurrentes encore en attente ce mois.
-
----
-
-## Récurrentes — cycle de vie
-
-```
-Créée → active, non pointée
-   │
-   ├─ Jour non encore arrivé     → dans les pending (compte dans FIN DE MOIS)
-   │
-   ├─ Jour = aujourd'hui
-   │     ├─ Non pointée          → dans les pending (en suspens)
-   │     └─ Pointée              → hors pending
-   │
-   └─ Jour passé
-         ├─ applied = false      → applyRecurringIfNeeded() crée la transaction
-         │                          + pointed[monthKey] = true
-         └─ applied = true       → transaction déjà créée, pointed = true
+```sql
+-- Compte clos (ne pas supprimer, juste masquer du tableau de bord)
+ALTER TABLE public.accounts ADD COLUMN IF NOT EXISTS closed boolean DEFAULT false;
 ```
 
-### Pointage (`r.pointed[monthKey]`)
-- `false` ou absent : récurrente **en attente**, comptée dans FIN DE MOIS
-- `true` : récurrente **passée**, exclue des pending (la transaction est dans le solde réel)
+### Notes FK importantes
 
-### Mise à jour du pointage
-| Action | Effet |
-|---|---|
-| `forceApplyRecurring()` — "Comptabiliser maintenant" | Crée la transaction + `pointed = true` + `applied.push()` |
-| `applyRecurringIfNeeded()` — auto au démarrage | Crée la transaction + `pointed = true` + `applied.push()` |
-| `togglePointed()` — case à cocher dans Récurrentes | Bascule `pointed` (bloqué si déjà `applied`) |
-| `toggleTransactionPointing()` — "Comptabilisé en banque" dans Opérations | `unpointed` sur la transaction + remonte sur `r.pointed` via ID `rec-{id}-{monthKey}` |
+La table `transactions` référence `accounts(id)` via plusieurs FK dont `transfer_from_fkey`. **Sans `ON DELETE CASCADE`**, la suppression d'un compte échoue si des transactions existent. Utiliser le bouton **"Clos"** plutôt que la suppression.
 
 ---
 
-## Format des IDs de transactions récurrentes
+## Fonctionnalités
 
-```
-rec-{recurringId}-{YYYY-MM}          → charge / produit
-rec-{recurringId}-{YYYY-MM}_out      → virement sortant
-rec-{recurringId}-{YYYY-MM}_in       → virement entrant
-```
+### Tableau de bord
+- Solde réel et solde fin de mois par compte
+- Total global (comptes inclus dans les totaux, non clos)
+- Charges récurrentes restantes du mois
+- Prochain prélèvement à venir
+- Comptes **clos exclus** des totaux et des cartes
 
-Ce format permet à `toggleTransactionPointing` de retrouver la récurrente parente et de synchroniser `pointed`.
+### Opérations
+- Saisie dépense / revenu / virement
+- Modification et suppression
+- Pointage (comptabilisé en banque)
+- Filtres : période, compte, type, catégorie
+
+### Récurrentes
+- Charges et revenus récurrents mensuels
+- Application manuelle par mois avec pointage
+- Lien prêt → récurrente automatique
+- Onglet dédié "Récurrentes"
+
+### Prêts
+- Suivi capital restant basé sur le nombre de mensualités **réellement appliquées** (`rec.applied.length`) — pas sur le temps écoulé
+- Calcul coût total (intérêts + assurance)
+- Barre de progression
+
+### Comptes
+- Types : courant, épargne, PEA, livret, etc.
+- Toggle "inclus dans les totaux"
+- Réorganisation par flèches ▲▼
+- **Bouton "Clos"** : masque le compte du tableau de bord et des selects sans le supprimer de Supabase (évite les erreurs FK)
+- Comptes clos affichés en grisé/barré dans les réglages, réactivables à tout moment
+
+### Synchronisation Supabase
+- Push automatique 1,5s après modification
+- Pull au démarrage
+- **Suppressions pendantes persistées** dans `localStorage['mp_pending_deletes']` — survivent au rechargement de page
+- Après `syncPull`, les comptes en attente de suppression sont filtrés localement
+- Table `holdings` (PEA) **optionnelle** — erreur silencieuse si absente
+- Erreur de sync affiche le message précis (PUSH: / PULL: + détail)
 
 ---
 
-## Thèmes
+## Logique de synchronisation des suppressions
 
-Trois thèmes CSS via variables `:root` :
+```
+deleteAccount(id)
+  → _dirty.deletedAccounts.add(id)
+  → savePendingDeletes()          ← persiste dans localStorage
+  → syncPush() immédiat
 
-| Classe | Mode |
-|---|---|
-| *(défaut)* | Sombre |
-| `.theme-light` | Clair |
-| `.theme-system` | Suit `prefers-color-scheme` |
+syncPull()
+  → db.accounts filtrés des deletedAccounts pendants
+  → db.transactions filtrées des accountId supprimés
+
+syncPush() réussi
+  → clearPendingDeletes()
+  → _dirty reset
+```
+
+---
+
+## Calcul capital restant prêt
+
+```
+paid = rec.applied.length   // mensualités réellement comptabilisées
+capitalRemaining = amount - (amount / duration) × paid
+```
+
+Fallback sur calcul temporel si aucune charge récurrente liée.
 
 ---
 
 ## Déploiement
 
-1. Modifier `index.html`
-2. Incrémenter `APP_VERSION` (constante JS)
-3. Pousser sur la branche GitHub Pages
-4. *(optionnel)* Mettre à jour `README.md`
+```bash
+git clone https://github.com/Robeenwind007/autothunes.git
+git add index.html
+git commit -m "v2.1.14"
+git push origin main
+```
 
 ---
 
-## Historique des versions récentes
+## Versioning
 
-| Version | Changement |
-|---|---|
-| 2.1.10 | `toggleTransactionPointing` synchronise `r.pointed` sur la récurrente parente → supprime le double comptage lors du pointage depuis Opérations |
-| 2.1.9 | `forceApplyRecurring` et `applyRecurringIfNeeded` posent `pointed = true` ; `togglePointed` bloqué si déjà `applied` |
-| 2.1.8 | Correction `isPending` : récurrentes du jour non pointées incluses dans les calculs FIN DE MOIS et EN COURS |
+| Version | Date | Changements principaux |
+|---|---|---|
+| 2.1.14 | Mars 2026 | Compte "Clos" (masque sans supprimer), persistance suppressions pendantes localStorage, filtre syncPull sur comptes supprimés |
+| 2.1.13 | Mars 2026 | Erreur sync détaillée (PUSH/PULL + message), holdings optionnel dans sync |
+| 2.1.12 | Mars 2026 | Holdings optionnel, push immédiat sur suppression compte, persistance deletedAccounts |
+| 2.1.11 | Mars 2026 | Correction loanStats : capital restant basé sur rec.applied.length |
+| 2.1.10 | Mars 2026 | Corrections récurrentes et soldes |
+| 2.0.x | Fév. 2026 | Migration Supabase multi-tables |
+| 1.x | Jan. 2026 | Version initiale localStorage (MonPognon) |
+
+---
+
+*AutoThunes — usage personnel*
