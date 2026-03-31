@@ -1036,7 +1036,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '2.1.10';
+const APP_VERSION = '2.1.11';
 
 // Render account icon: image if base64, emoji otherwise
 function iconHTML(icon, size='26px') {
@@ -3406,10 +3406,18 @@ function deleteLoan(id) {
 
 function loanStats(loan) {
   const now      = new Date();
-  // Référence : date de la 1ère échéance si disponible, sinon date début
   const ref      = new Date(loan.firstPayment || loan.start);
-  const elapsed  = (now.getFullYear() - ref.getFullYear()) * 12 + (now.getMonth() - ref.getMonth());
-  const paid     = Math.max(0, Math.min(elapsed, loan.duration));
+  // Utiliser les mois réellement appliqués via la charge récurrente si disponible
+  const rec = db.recurringCharges && db.recurringCharges.find(r => r.loanId === loan.id);
+  let paid;
+  if (rec && rec.applied && rec.applied.length > 0) {
+    // Nombre de mensualités réellement passées en comptabilité
+    paid = Math.min(rec.applied.length, loan.duration);
+  } else {
+    // Fallback : calcul par le temps écoulé
+    const elapsed = (now.getFullYear() - ref.getFullYear()) * 12 + (now.getMonth() - ref.getMonth());
+    paid = Math.max(0, Math.min(elapsed, loan.duration));
+  }
   const remaining = loan.duration - paid;
   const capitalPerMonth  = loan.amount / loan.duration;
   const capitalRemaining = Math.max(0, loan.amount - capitalPerMonth * paid);
