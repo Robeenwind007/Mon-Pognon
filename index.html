@@ -1036,7 +1036,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '2.1.11';
+const APP_VERSION = '2.1.14';
 
 // Render account icon: image if base64, emoji otherwise
 function iconHTML(icon, size='26px') {
@@ -1101,6 +1101,7 @@ let periodOffset = 0;
 // ════════════════════════════════════
 function init() {
   applyTheme(localStorage.getItem('mp_theme') || 'dark');
+  loadPendingDeletes(); // Restaurer les suppressions en attente
   if(!db.categories) { db.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)); saveLocal(); }
   if(!db.loans) { db.loans = []; }
   if(!db.holdings) { db.holdings = []; }
@@ -1132,7 +1133,7 @@ function populateSelects() {
   accSelects.forEach(id => {
     const el = document.getElementById(id); if(!el) return;
     el.innerHTML = db.accounts.length
-      ? db.accounts.map(a=>`<option value="${a.id}">${a.icon&&a.icon.startsWith('data:')?' &#127968;':a.icon} ${a.name}</option>`).join('')
+      ? db.accounts.filter(a=>!a.closed).map(a=>`<option value="${a.id}">${a.icon&&a.icon.startsWith('data:')?' &#127968;':a.icon} ${a.name}</option>`).join('')
       : '<option value="">— Aucun compte —</option>';
   });
   catSelects.forEach(id => {
@@ -1290,11 +1291,14 @@ function deleteAccount(id) {
   if(!a) return;
   confirmDelete('Supprimer ce compte ?', `"${a.name}" et toutes ses opérations seront supprimés.`, () => {
     _dirty.deletedAccounts.add(id);
+    savePendingDeletes(); // Persiste la suppression même si la page est rechargée
     // Les transactions et récurrentes seront supprimées en cascade par Supabase (ON DELETE CASCADE)
     db.accounts = db.accounts.filter(a=>a.id!==id);
     db.transactions = db.transactions.filter(t=>t.accountId!==id);
     db.recurringCharges = db.recurringCharges.filter(r=>r.accountId!==id);
-    save(); populateSelects(); renderDashboard(); renderAccountsManage(); renderRecurring();
+    saveLocal(); populateSelects(); renderDashboard(); renderAccountsManage(); renderRecurring();
+    clearTimeout(syncTimeout);
+    syncPush();
   });
 }
 
@@ -1426,6 +1430,17 @@ function applyRecurringIfNeeded() {
   save();
 }
 
+function toggleAccountClosed(id) {
+  const a = db.accounts.find(a=>a.id===id);
+  if(!a) return;
+  a.closed = !a.closed;
+  markDirty('accounts', id);
+  save();
+  populateSelects();
+  renderDashboard();
+  renderAccountsManage();
+}
+
 function renderAccountsManage() {
   const el = document.getElementById('accounts-list-manage');
   if(!el) return;
@@ -1458,7 +1473,7 @@ function renderAccountsManage() {
                                   : `<span style="font-size:14px;line-height:1;cursor:pointer;color:var(--muted)" onclick="moveAccount('${a.id}',-1)">▲</span>`;
     const btnDown = idx===total-1 ? `<span style="font-size:14px;line-height:1;color:var(--border)">▼</span>`
                                   : `<span style="font-size:14px;line-height:1;cursor:pointer;color:var(--muted)" onclick="moveAccount('${a.id}',1)">▼</span>`;
-    return `<div class="tx-item" style="${!included?'opacity:.6':''}">
+    return `<div class="tx-item" style="${a.closed?'opacity:.4;filter:grayscale(1)':(!included?'opacity:.6':'')}${a.closed?';text-decoration:line-through':''}">
       <div style="display:flex;flex-direction:column;gap:2px;margin-right:6px">${btnUp}${btnDown}</div>
       <div class="tx-icon expense">${iconHTML(a.icon, '22px')}</div>
       <div class="tx-info">
@@ -1470,6 +1485,7 @@ function renderAccountsManage() {
         <div style="display:flex;align-items:center;gap:8px">
           ${toggleSwitch}
           <span style="font-size:10px;color:var(--accent);cursor:pointer" onclick="openEditAccount('${a.id}')">✏️</span>
+          <span style="font-size:11px;cursor:pointer;padding:2px 7px;border-radius:5px;border:1px solid;${a.closed?'color:var(--green);border-color:var(--green)':'color:var(--muted);border-color:var(--border)'}" onclick="toggleAccountClosed('${a.id}')" title="${a.closed?'Réactiver':'Clore le compte'}">${a.closed?'Actif':'Clos'}</span>
           <span style="font-size:10px;color:var(--red);cursor:pointer" onclick="deleteAccount('${a.id}')">🗑</span>
         </div>
       </div>
@@ -2292,8 +2308,8 @@ function renderDashboard() {
   const now = new Date();
   const todayDay = now.getDate();
 
-  const totalReal  = db.accounts.filter(a=>a.includeInTotal!==false).reduce((s,a)=>s+accountBalance(a.id),0);
-  const totalMonth = db.accounts.filter(a=>a.includeInTotal!==false).reduce((s,a)=>s+accountMonthBalance(a.id),0);
+  const totalReal  = db.accounts.filter(a=>a.includeInTotal!==false && !a.closed).reduce((s,a)=>s+accountBalance(a.id),0);
+  const totalMonth = db.accounts.filter(a=>a.includeInTotal!==false && !a.closed).reduce((s,a)=>s+accountMonthBalance(a.id),0);
 
   // Opérations récurrentes restantes ce mois (jour > aujourd'hui OU du jour non pointé, actives uniquement)
   const dashMonthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
@@ -2327,7 +2343,7 @@ function renderDashboard() {
     ctaEl.style.display = 'block';
   } else {
     ctaEl.style.display = 'none';
-    accEl.innerHTML = db.accounts.map(a=>{
+    accEl.innerHTML = db.accounts.filter(a=>!a.closed).map(a=>{
       const real  = accountBalance(a.id);
       const month = accountMonthBalance(a.id);
       const typeInfo = ACCOUNT_TYPES[a.type] || { label: a.type||'', icon: a.icon };
@@ -3587,7 +3603,8 @@ function accountToRow(a) {
     type:             a.type || 'courant',
     initial_balance:  parseFloat(a.initialBalance) || 0,
     include_in_total: a.includeInTotal !== false,
-    sort_order:       a._sortOrder || 0
+    sort_order:       a._sortOrder || 0,
+    closed:           a.closed || false
   };
 }
 function rowToAccount(r) {
@@ -3598,7 +3615,8 @@ function rowToAccount(r) {
     type:           r.type,
     initialBalance: parseFloat(r.initial_balance) || 0,
     includeInTotal: r.include_in_total !== false,
-    _sortOrder:     r.sort_order || 0
+    _sortOrder:     r.sort_order || 0,
+    closed:         r.closed || false
   };
 }
 
@@ -3730,6 +3748,27 @@ let _dirty = { accounts: new Set(), transactions: new Set(), recurring: new Set(
                deletedLoans: new Set(), deletedCategories: new Set(), deletedHoldings: new Set(),
                newApplied: [] };
 
+// Persister les suppressions pendantes pour survie au rechargement de page
+const PENDING_DELETES_KEY = 'mp_pending_deletes';
+function loadPendingDeletes() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PENDING_DELETES_KEY) || '{}');
+    if (p.accounts)  p.accounts.forEach(id  => _dirty.deletedAccounts.add(id));
+    if (p.loans)     p.loans.forEach(id     => _dirty.deletedLoans.add(id));
+    if (p.tx)        p.tx.forEach(id        => _dirty.deletedTx.add(id));
+  } catch(e) {}
+}
+function savePendingDeletes() {
+  localStorage.setItem(PENDING_DELETES_KEY, JSON.stringify({
+    accounts: [..._dirty.deletedAccounts],
+    loans:    [..._dirty.deletedLoans],
+    tx:       [..._dirty.deletedTx]
+  }));
+}
+function clearPendingDeletes() {
+  localStorage.removeItem(PENDING_DELETES_KEY);
+}
+
 function markDirty(type, id) {
   if(_dirty[type]) _dirty[type].add(id);
 }
@@ -3814,15 +3853,15 @@ async function syncPush() {
       if(rows.length) await sbUpsert('labels', rows);
     }
 
-    // Holdings PEA
+    // Holdings PEA : optionnel
     if(_dirty.holdings.size > 0) {
       const rows = (db.holdings || [])
         .filter(h => _dirty.holdings.has(h.id))
         .map(holdingToRow);
-      if(rows.length) await sbUpsert('holdings', rows);
+      if(rows.length) await sbUpsert('holdings', rows).catch(e => console.warn('holdings upsert skipped:', e.message));
     }
     if(_dirty.deletedHoldings.size > 0) {
-      await sbDelete('holdings', [..._dirty.deletedHoldings]);
+      await sbDelete('holdings', [..._dirty.deletedHoldings]).catch(e => console.warn('holdings delete skipped:', e.message));
     }
 
     // Reset dirty
@@ -3832,11 +3871,13 @@ async function syncPush() {
                deletedTx: new Set(), deletedRec: new Set(), deletedAccounts: new Set(),
                deletedLoans: new Set(), deletedCategories: new Set(), deletedHoldings: new Set(),
                newApplied: [] };
+    clearPendingDeletes(); // Suppressions confirmées par Supabase
 
     setSyncStatus('✓ synchronisé', 'var(--green)');
   } catch(e) {
     console.error('syncPush error:', e);
-    setSyncStatus('⚠ erreur sync', 'var(--orange)');
+    const msg = e.message ? e.message.substring(0, 80) : String(e);
+    setSyncStatus('⚠ PUSH: ' + msg, 'var(--orange)');
   } finally {
     syncBusy = false;
   }
@@ -3854,7 +3895,7 @@ async function syncPull() {
     // Chargement parallèle de toutes les tables
     const [
       accRows, txRows, recRows, appliedRows,
-      loanRows, catRows, labelRows, holdingRows
+      loanRows, catRows, labelRows
     ] = await Promise.all([
       sbSelect('accounts', 'order=sort_order.asc,created_at.asc'),
       sbSelect('transactions', 'order=date.desc,created_at.desc'),
@@ -3862,9 +3903,10 @@ async function syncPull() {
       sbSelect('recurring_applied'),
       sbSelect('loans', 'order=created_at.asc'),
       sbSelect('categories', 'order=created_at.asc'),
-      sbSelect('labels', 'order=uses.desc'),
-      sbSelect('holdings', 'order=created_at.asc')
+      sbSelect('labels', 'order=uses.desc')
     ]);
+    // Holdings PEA : table optionnelle, silencieux si absente
+    const holdingRows = await sbSelect('holdings', 'order=created_at.asc').catch(() => []);
 
     // Construire la map applied par recurring_id
     const appliedMap = {};
@@ -3874,8 +3916,10 @@ async function syncPull() {
     });
 
     // Remplir db
-    db.accounts         = accRows.map(rowToAccount);
-    db.transactions     = txRows.map(rowToTransaction);
+    db.accounts         = accRows.map(rowToAccount)
+      .filter(a => !_dirty.deletedAccounts.has(a.id)); // Exclure les suppressions pendantes
+    db.transactions     = txRows.map(rowToTransaction)
+      .filter(t => !_dirty.deletedAccounts.has(t.accountId)); // Exclure les tx des comptes supprimés
     db.recurringCharges = recRows.map(r => {
       const rec = rowToRecurring(r);
       rec.applied = appliedMap[r.id] || [];
@@ -3893,7 +3937,8 @@ async function syncPull() {
     return true;
   } catch(e) {
     console.error('syncPull error:', e);
-    setSyncStatus('⚠ hors ligne', 'var(--orange)');
+    const pullMsg = e.message ? e.message.substring(0, 80) : String(e);
+    setSyncStatus('⚠ PULL: ' + pullMsg, 'var(--orange)');
     return false;
   } finally {
     syncBusy = false;
