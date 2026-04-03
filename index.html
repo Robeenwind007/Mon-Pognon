@@ -1036,7 +1036,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '2.1.14';
+const APP_VERSION = '2.1.16';
 
 // Render account icon: image if base64, emoji otherwise
 function iconHTML(icon, size='26px') {
@@ -2602,7 +2602,7 @@ function renderOperations() {
         : '';
 
       // Pointage : checkbox uniquement sur les récurrentes passées (pas futures, pas les manuelles)
-      const showPointing = t.isRecurring && !isFuture && !(t.isTransfer && t.id.endsWith('_out'));
+      const showPointing = t.isRecurring && !isFuture;
       const isPointed = !t.unpointed;
       const unpointedStyle = (showPointing && !isPointed) ? 'opacity:.5;' : '';
 
@@ -3554,11 +3554,15 @@ function setSyncStatus(msg, color) {
 }
 
 // Upsert générique (insert or update)
-async function sbUpsert(table, rows) {
+async function sbUpsert(table, rows, conflictCol) {
   if(!rows || rows.length === 0) return;
-  const res = await fetch(`${SB_URL}/rest/v1/${table}`, {
+  const prefer = conflictCol
+    ? `resolution=merge-duplicates,return=minimal`
+    : 'resolution=merge-duplicates';
+  const qs = conflictCol ? `?on_conflict=${conflictCol}` : '';
+  const res = await fetch(`${SB_URL}/rest/v1/${table}${qs}`, {
     method: 'POST',
-    headers: sbHeaders({ 'Prefer': 'resolution=merge-duplicates' }),
+    headers: sbHeaders({ 'Prefer': prefer }),
     body: JSON.stringify(rows)
   });
   if(!res.ok) {
@@ -3850,7 +3854,7 @@ async function syncPush() {
       const rows = (db.labels || [])
         .filter(l => _dirty.labels.has(l.text))
         .map(labelToRow);
-      if(rows.length) await sbUpsert('labels', rows);
+      if(rows.length) await sbUpsert('labels', rows, 'text');
     }
 
     // Holdings PEA : optionnel
