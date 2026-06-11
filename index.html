@@ -617,6 +617,10 @@
         <option value="expense">Dépenses</option>
         <option value="transfer">Virements</option>
       </select>
+      <button id="ops-filter-unpointed" onclick="toggleUnpointedFilter()" title="Afficher uniquement les non pointés"
+        style="font-size:12px;padding:5px 10px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer;white-space:nowrap;transition:all .2s;font-family:'Sora',sans-serif">
+        ◎ Non pointés
+      </button>
     </div>
     <div id="operations-list"></div>
   </div>
@@ -1036,7 +1040,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '2.1.16';
+const APP_VERSION = '2.1.17';
 
 // Render account icon: image if base64, emoji otherwise
 function iconHTML(icon, size='26px') {
@@ -2550,6 +2554,21 @@ function renderOperations() {
 
   const filterAcc  = accSel ? accSel.value : '';
   const filterType = document.getElementById('ops-filter-type')?.value || '';
+  const filterUnpointed = window._opsFilterUnpointed || false;
+
+  // Mettre à jour visuellement le bouton filtre
+  const btn = document.getElementById('ops-filter-unpointed');
+  if(btn) {
+    if(filterUnpointed) {
+      btn.style.background = 'rgba(34,211,238,.12)';
+      btn.style.color = 'var(--accent2)';
+      btn.style.borderColor = 'var(--accent2)';
+    } else {
+      btn.style.background = 'var(--bg3)';
+      btn.style.color = 'var(--muted)';
+      btn.style.borderColor = 'var(--border)';
+    }
+  }
 
   // Toutes les transactions (récurrentes incluses)
   let txs = db.transactions.slice();
@@ -2560,10 +2579,13 @@ function renderOperations() {
   if(filterAcc)  txs = txs.filter(t => t.accountId === filterAcc || t.transferTo === filterAcc);
   if(filterType) txs = txs.filter(t => t.type === filterType);
 
+  // Filtre non pointés : on garde les transactions où unpointed===true
+  if(filterUnpointed) txs = txs.filter(t => t.unpointed);
+
   txs = txs.sort((a,b) => b.date.localeCompare(a.date));
 
   if(!txs.length) {
-    el.innerHTML='<div class="empty-state"><span class="emoji">📋</span><p>Aucune opération</p></div>'; return;
+    el.innerHTML='<div class="empty-state"><span class="emoji">' + (filterUnpointed ? '✅' : '📋') + '</span><p>' + (filterUnpointed ? 'Tout est pointé !' : 'Aucune opération') + '</p></div>'; return;
   }
 
   // Grouper par mois
@@ -2601,19 +2623,19 @@ function renderOperations() {
         ? 'opacity:.55;font-style:italic;background:repeating-linear-gradient(135deg,transparent,transparent 6px,rgba(255,255,255,.015) 6px,rgba(255,255,255,.015) 12px)'
         : '';
 
-      // Pointage : checkbox uniquement sur les récurrentes passées (pas futures, pas les manuelles)
-      const showPointing = t.isRecurring && !isFuture;
+      // Pointage sur toutes les transactions passées (pas les futures)
+      const showPointing = !isFuture;
       const isPointed = !t.unpointed;
-      const unpointedStyle = (showPointing && !isPointed) ? 'opacity:.5;' : '';
+      const unpointedStyle = (showPointing && !isPointed) ? 'opacity:.6;' : '';
 
       const recBadge = t.isRecurring ? ' · <span style="color:var(--orange);font-style:normal;font-size:10px;font-weight:600">🔄 récurrent</span>' : '';
       const pointingBtn = showPointing ? `
-        <label title="${isPointed ? 'Comptabilisé en banque — cliquer pour exclure' : 'Non comptabilisé en banque — cliquer pour inclure'}"
+        <label title="${isPointed ? 'Pointé — cliquer pour dépointage' : 'Non pointé — cliquer pour pointer'}"
           style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;margin-top:3px" onclick="event.stopPropagation();toggleTransactionPointing('${t.id}')">
           <span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;border:1.5px solid ${isPointed?'var(--green)':'var(--border)'};background:${isPointed?'var(--green)':'transparent'};flex-shrink:0;transition:all .15s">
             ${isPointed?'<svg width="10" height="10" viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}
           </span>
-          <span style="font-size:10px;color:${isPointed?'var(--green)':'var(--muted)'};">${isPointed?'Comptabilisé en banque':'Non comptabilisé en banque'}</span>
+          <span style="font-size:10px;color:${isPointed?'var(--green)':'var(--muted)'};">${isPointed?'Pointé':'Non pointé'}</span>
         </label>` : '';
 
       return `<div class="tx-item" style="${futureStyle}${unpointedStyle}">
@@ -2648,9 +2670,12 @@ function renderOperations() {
   requestAnimationFrame(() => { el.innerHTML = newHTML; });
 }
 
-// ════════════════════════════════════
-//  STATS
-// ════════════════════════════════════
+function toggleUnpointedFilter() {
+  window._opsFilterUnpointed = !window._opsFilterUnpointed;
+  renderOperations();
+}
+
+
 function setPeriod(p, el) {
   currentPeriod = p; periodOffset = 0;
   document.querySelectorAll('.period-tab').forEach(t=>t.classList.remove('active'));
