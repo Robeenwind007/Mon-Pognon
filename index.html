@@ -621,6 +621,26 @@
         style="font-size:12px;padding:5px 10px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer;white-space:nowrap;transition:all .2s;font-family:'Sora',sans-serif">
         ◎ Non pointés
       </button>
+      <button onclick="openReconciliation()"
+        style="font-size:12px;padding:5px 10px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer;white-space:nowrap;transition:all .2s;font-family:'Sora',sans-serif">
+        ⚖️ Rapprochement
+      </button>
+      <button onclick="openImport()"
+        style="font-size:12px;padding:5px 10px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer;white-space:nowrap;transition:all .2s;font-family:'Sora',sans-serif">
+        📥 Importer
+      </button>
+    </div>
+    <!-- Barre de recherche -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <div style="flex:1;position:relative">
+        <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--muted)">🔍</span>
+        <input id="ops-search-label" type="text" placeholder="Rechercher un libellé…"
+          oninput="renderOperations()"
+          style="width:100%;box-sizing:border-box;padding:7px 10px 7px 32px;border-radius:10px;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:'Sora',sans-serif;font-size:12px">
+      </div>
+      <input id="ops-search-amount" type="number" placeholder="Montant" min="0" step="0.01"
+        oninput="renderOperations()"
+        style="width:90px;padding:7px 8px;border-radius:10px;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:12px">
     </div>
     <div id="operations-list"></div>
   </div>
@@ -843,7 +863,7 @@
         <div style="font-size:12px;color:var(--muted);margin-bottom:8px">⚠️ Remplace toutes les données actuelles par celles du fichier.</div>
         <label style="display:block;width:100%;box-sizing:border-box;padding:11px;background:var(--bg3);border:1.5px dashed var(--border);border-radius:12px;text-align:center;font-size:13px;color:var(--muted);cursor:pointer">
           Choisir un fichier .json
-          <input type="file" id="import-file" accept=".json,application/json" style="display:none" onchange="importData(this)">
+          <input type="file" id="import-file"  style="display:none" onchange="importData(this)">
         </label>
         <div id="import-status" style="margin-top:8px;font-size:12px;display:none"></div>
       </div>
@@ -907,6 +927,91 @@
     </div>
   </div>
 
+</div>
+
+<!-- ══ SHEET: RAPPROCHEMENT ══ -->
+<div class="overlay" id="overlay-reconciliation-sheet" onclick="closeSheet('reconciliation-sheet')"></div>
+<div class="sheet" id="reconciliation-sheet">
+  <div class="sheet-handle"></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div class="sheet-title" style="margin-bottom:0">⚖️ Rapprochement bancaire</div>
+    <button onclick="closeSheet('reconciliation-sheet')" style="background:none;border:none;font-size:22px;color:var(--muted);cursor:pointer;padding:4px;line-height:1">×</button>
+  </div>
+  
+
+  <div class="form-group">
+    <label>Compte</label>
+    <select id="rec-bank-account" onchange="updateReconciliation()"
+      style="font-family:'Sora',sans-serif;font-size:14px"></select>
+  </div>
+
+  <div class="form-group">
+    <label>Solde relevé bancaire (€)</label>
+    <input id="rec-bank-balance" type="number" step="0.01" placeholder="Ex: 1234.56"
+      oninput="updateReconciliation()"
+      style="font-family:'DM Mono',monospace;font-size:16px">
+  </div>
+
+  <div id="rec-result" style="margin-top:16px;display:none">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div class="card" style="padding:12px;margin-bottom:0">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Solde AutoThunes</div>
+        <div id="rec-app-balance" style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:var(--text)">-</div>
+      </div>
+      <div class="card" style="padding:12px;margin-bottom:0">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Solde banque</div>
+        <div id="rec-bank-display" style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:var(--text)">-</div>
+      </div>
+    </div>
+    <div class="card" style="padding:14px;margin-bottom:14px;text-align:center">
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Ecart</div>
+      <div id="rec-gap" style="font-family:'DM Mono',monospace;font-size:24px;font-weight:700">-</div>
+      <div id="rec-gap-label" style="font-size:12px;color:var(--muted);margin-top:4px"></div>
+    </div>
+    <div id="rec-unpointed-section" style="display:none">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Operations non pointees sur ce compte :</div>
+      <div id="rec-unpointed-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SHEET: IMPORT CSV ══ -->
+<div class="overlay" id="overlay-import-sheet" onclick="closeSheet('import-sheet')"></div>
+<div class="sheet" id="import-sheet" style="max-height:85vh;overflow-y:auto;padding-bottom:40px">
+  <div class="sheet-handle"></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div class="sheet-title" style="margin-bottom:0">📥 Import CSV Société Générale</div>
+    <button onclick="closeSheet('import-sheet')" style="background:none;border:none;font-size:22px;color:var(--muted);cursor:pointer;padding:4px;line-height:1">×</button>
+  </div>
+
+  <div class="form-group">
+    <label>Compte cible</label>
+    <select id="import-account" style="font-family:'Sora',sans-serif;font-size:14px"></select>
+  </div>
+
+  <div class="form-group">
+    <label>Fichier CSV (export SG, séparateur point-virgule)</label>
+    <label for="import-csv-file" id="import-file-label"
+      style="display:block;width:100%;padding:10px;border-radius:10px;background:var(--bg3);border:1.5px solid var(--border);color:var(--muted);font-size:13px;cursor:pointer;text-align:center;box-sizing:border-box">
+      📂 Sélectionner le fichier CSV
+    </label>
+    <input type="file" id="import-csv-file" style="display:none"
+      onchange="document.getElementById('import-file-label').textContent='✅ ' + this.files[0].name">
+    <button onclick="parseImportCSV()"
+      style="margin-top:8px;width:100%;padding:10px;border-radius:10px;background:var(--accent);color:#fff;border:none;font-family:'Sora',sans-serif;font-size:14px;font-weight:600;cursor:pointer">
+      Charger les écritures
+    </button>
+  </div>
+
+  <div id="import-preview" style="display:none">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px">
+      <span id="import-count"></span> — décochez les lignes à ignorer
+    </div>
+    <div id="import-lines"></div>
+    <button class="btn btn-primary" onclick="confirmImport()" style="margin-top:16px">
+      ✅ Importer les écritures sélectionnées
+    </button>
+  </div>
 </div>
 
 <!-- BOTTOM NAV -->
@@ -1040,7 +1145,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '2.1.17';
+const APP_VERSION = '2.2.0';
 
 // Render account icon: image if base64, emoji otherwise
 function iconHTML(icon, size='26px') {
@@ -2514,7 +2619,8 @@ function renderDashboard() {
         : `${dateStr} · ${acc?acc.name:'?'} · ${cat.label}`;
       const pointed  = r.pointed && r.pointed[monthKey];
       const pointedStyle = pointed ? 'opacity:.45;text-decoration:line-through' : '';
-      return `<div class="tx-item" style="${pointedStyle}">
+      const importedStyle = (!pointed && r.imported) ? 'background:rgba(244,63,94,.08);border-radius:10px;' : '';
+      return `<div class="tx-item" style="${pointedStyle}${importedStyle}">
         <div class="tx-icon" style="background:${bgCol};font-size:${isTransfer?'16px':'18px'}">${icon}</div>
         <div class="tx-info">
           <div class="tx-name">${r.label}</div>
@@ -2555,6 +2661,8 @@ function renderOperations() {
   const filterAcc  = accSel ? accSel.value : '';
   const filterType = document.getElementById('ops-filter-type')?.value || '';
   const filterUnpointed = window._opsFilterUnpointed || false;
+  const filterLabel  = (document.getElementById('ops-search-label')?.value || '').toLowerCase().trim();
+  const filterAmount = parseFloat(document.getElementById('ops-search-amount')?.value || '') || null;
 
   // Mettre à jour visuellement le bouton filtre
   const btn = document.getElementById('ops-filter-unpointed');
@@ -2577,7 +2685,9 @@ function renderOperations() {
   txs = txs.filter(t => !(t.isTransfer && t.id.endsWith('_in')));
 
   if(filterAcc)  txs = txs.filter(t => t.accountId === filterAcc || t.transferTo === filterAcc);
-  if(filterType) txs = txs.filter(t => t.type === filterType);
+  if(filterType)   txs = txs.filter(t => t.type === filterType);
+  if(filterLabel)  txs = txs.filter(t => (t.label||'').toLowerCase().includes(filterLabel));
+  if(filterAmount) txs = txs.filter(t => Math.abs(t.amount - filterAmount) < 0.01);
 
   // Filtre non pointés : on garde les transactions où unpointed===true
   if(filterUnpointed) txs = txs.filter(t => t.unpointed);
@@ -3663,6 +3773,7 @@ function transactionToRow(t) {
     transfer_from:t.transferFrom || null,
     transfer_to:  t.transferTo || null,
     is_recurring: t.isRecurring || false,
+    imported:     t.imported || false,
     recurring_id: t.recurringId || null,
     is_unpointed: t.unpointed || false
   };
@@ -4638,6 +4749,251 @@ function enterApp() {
   // Lancer la sync en arrière-plan
   start();
   setTimeout(() => splash.remove(), 400);
+}
+
+
+// ════════════════════════════════════
+//  RAPPROCHEMENT BANCAIRE
+// ════════════════════════════════════
+function openReconciliation() {
+  // Peupler le select des comptes
+  const sel = document.getElementById('rec-bank-account');
+  if(sel) {
+    sel.innerHTML = db.accounts.map(a =>
+      `<option value="${a.id}">${a.icon&&a.icon.startsWith('data:')?'🏦':a.icon} ${a.name}</option>`
+    ).join('');
+  }
+  // Sélectionner le compte actif dans le filtre ops si présent
+  const opsAcc = document.getElementById('ops-filter-account')?.value;
+  if(opsAcc && sel) sel.value = opsAcc;
+
+  document.getElementById('rec-bank-balance').value = '';
+  document.getElementById('rec-result').style.display = 'none';
+  openSheet('reconciliation-sheet');
+  updateReconciliation();
+}
+
+function updateReconciliation() {
+  const accountId = document.getElementById('rec-bank-account')?.value;
+  const bankBalanceRaw = parseFloat(document.getElementById('rec-bank-balance')?.value);
+  const resultEl = document.getElementById('rec-result');
+
+  // Solde AutoThunes pour ce compte (toutes écritures saisies)
+  const appBalance = accountBalance(accountId);
+
+  // Afficher solde app toujours
+  document.getElementById('rec-app-balance').textContent = fmt(appBalance);
+
+  if(isNaN(bankBalanceRaw)) {
+    resultEl.style.display = 'none';
+    return;
+  }
+
+  resultEl.style.display = 'block';
+  const gap = appBalance - bankBalanceRaw;
+
+  document.getElementById('rec-bank-display').textContent = fmt(bankBalanceRaw);
+
+  const gapEl = document.getElementById('rec-gap');
+  const gapLabel = document.getElementById('rec-gap-label');
+  gapEl.textContent = (gap >= 0 ? '+' : '') + fmt(gap);
+  gapEl.style.color = Math.abs(gap) < 0.01 ? 'var(--green)' : gap > 0 ? 'var(--orange)' : 'var(--red)';
+
+  if(Math.abs(gap) < 0.01) {
+    gapLabel.textContent = '✅ Comptes équilibrés';
+  } else if(gap > 0) {
+    gapLabel.textContent = 'AutoThunes est supérieur — des écritures ne sont pas encore passées en banque';
+  } else {
+    gapLabel.textContent = 'La banque est supérieure — des opérations bancaires ne sont pas saisies';
+  }
+
+  // Liste des non pointés sur ce compte
+  const unpointed = db.transactions.filter(t =>
+    t.unpointed && (t.accountId === accountId || t.transferTo === accountId)
+    && !(t.isTransfer && t.id.endsWith('_in'))
+  ).sort((a,b) => b.date.localeCompare(a.date));
+
+  const secEl = document.getElementById('rec-unpointed-section');
+  const listEl = document.getElementById('rec-unpointed-list');
+
+  if(unpointed.length > 0) {
+    secEl.style.display = 'block';
+    listEl.innerHTML = unpointed.map(t => {
+      const isExp = t.type === 'expense';
+      const amtColor = t.type === 'income' ? 'color:var(--green)' : t.type === 'expense' ? 'color:var(--red)' : 'color:var(--muted)';
+      const prefix = t.type === 'income' ? '+' : t.type === 'expense' ? '-' : '';
+      return `<div class="tx-item" style="padding:10px 0">
+        <div class="tx-info">
+          <div class="tx-name">${t.label}</div>
+          <div class="tx-sub">${t.date}</div>
+        </div>
+        <div style="${amtColor};font-family:'DM Mono',monospace;font-weight:600">${prefix}${fmt(t.amount)}</div>
+      </div>`;
+    }).join('');
+  } else {
+    secEl.style.display = 'none';
+  }
+}
+
+
+// ════════════════════════════════════
+//  IMPORT CSV SOCIETE GENERALE
+// ════════════════════════════════════
+let _importRows = [];
+
+function openImport() {
+  const sel = document.getElementById('import-account');
+  if(sel) {
+    sel.innerHTML = db.accounts.map(a =>
+      `<option value="${a.id}">${a.icon&&a.icon.startsWith('data:')?'🏦':a.icon} ${a.name}</option>`
+    ).join('');
+    // Pré-sélectionner le compte filtré si présent
+    const opsAcc = document.getElementById('ops-filter-account')?.value;
+    if(opsAcc) sel.value = opsAcc;
+  }
+  document.getElementById('import-file').value = '';
+  document.getElementById('import-preview').style.display = 'none';
+  _importRows = [];
+  openSheet('import-sheet');
+}
+
+function parseImportCSV() {
+  const file = document.getElementById('import-csv-file').files[0];
+  if(!file) { alert('Sélectionnez d\'abord un fichier'); return; }
+
+  const reader = new FileReader();
+  reader.onerror = function() { alert('Erreur lecture'); };
+  reader.onload = function(e) {
+      const buf = e.target.result;
+    const bytes = new Uint8Array(buf);
+    let text = '';
+    for(let i = 0; i < bytes.length; i++) text += String.fromCharCode(bytes[i]);
+
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+
+    // Chercher la ligne d'en-tête (contient "Date de l")
+    // Chercher la ligne d'en-tête : commence par une date DD/MM/YYYY non trouvée, ou contient 'Libell'
+    // La ligne 0 est la métadonnée (="xxxx"), la ligne 1 est l'en-tête SG
+    let headerIdx = lines.findIndex(l => l.includes('Libell'));
+    if(headerIdx === -1) {
+      // Fallback : première ligne qui ne ressemble pas à une date
+      headerIdx = lines.findIndex((l,i) => i>0 && !l.match(/^[0-9]{2}\/[0-9]{2}\/[0-9]{4}/));
+    }
+    if(headerIdx === -1) headerIdx = 1; // dernier fallback
+
+    const dataLines = lines.slice(headerIdx + 1);
+    _importRows = [];
+
+    dataLines.forEach((line, idx) => {
+      const cols = line.split(';');
+      if(cols.length < 4) return;
+      const dateRaw = cols[0].trim().replace(/"/g,'');
+      const label   = cols[1].trim().replace(/"/g,'');
+      const detail  = cols[2].trim().replace(/"/g,'');
+      const amtRaw  = cols[3].trim().replace(/"/g,'').replace(',','.');
+      const amount  = parseFloat(amtRaw);
+
+      if(!dateRaw || isNaN(amount)) return;
+
+      // Convertir date DD/MM/YYYY -> YYYY-MM-DD
+      const [d,m,y] = dateRaw.split('/');
+      const date = `${y}-${m}-${d}`;
+
+      // Détecter doublon
+      const exists = db.transactions.some(t =>
+        t.date === date && t.label === label && Math.abs(Math.abs(t.amount) - Math.abs(amount)) < 0.01
+      );
+
+      _importRows.push({ idx, date, label, detail, amount, exists, category: '', selected: !exists });
+    });
+
+    console.log('Import: lignes trouvées:', _importRows.length, 'headerIdx:', headerIdx);
+    if(_importRows.length === 0) {
+      alert('Aucune écriture trouvée dans ce fichier. Vérifiez que c\'est bien un export CSV SG séparateur point-virgule.');
+      return;
+    }
+    renderImportPreview();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function renderImportPreview() {
+  const preview = document.getElementById('import-preview');
+  const linesEl = document.getElementById('import-lines');
+  const countEl = document.getElementById('import-count');
+
+  const total = _importRows.length;
+  const selected = _importRows.filter(r => r.selected).length;
+  const dupes = _importRows.filter(r => r.exists).length;
+
+  countEl.textContent = `${total} écritures trouvées · ${selected} sélectionnées · ${dupes} doublons détectés`;
+  preview.style.display = 'block';
+  document.getElementById('import-sheet').scrollTop = 0;
+
+  const cats = (typeof CATEGORIES !== 'undefined' ? CATEGORIES : db.categories || []);
+  const catOptions = cats.map(c => `<option value="${c.id}">${c.icon} ${c.label}</option>`).join('');
+
+  linesEl.innerHTML = _importRows.map(row => {
+    const amtColor = row.amount >= 0 ? 'color:var(--green)' : 'color:var(--red)';
+    const prefix = row.amount >= 0 ? '+' : '';
+    const dupeTag = row.exists ? ' ⚠️' : '';
+    const bg = row.selected ? 'var(--card)' : 'var(--bg)';
+    const border = row.selected ? '2px solid var(--accent)' : '2px solid var(--border)';
+    const checkIcon = row.selected ? '✅' : '⬜';
+    return `<div onclick="toggleImportRow(${row.idx})" style="padding:12px;border-radius:12px;background:${bg};border:${border};margin-bottom:8px;cursor:pointer;transition:all .15s">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:${row.selected?'8':'0'}px">
+        <span style="font-size:20px;flex-shrink:0">${checkIcon}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${row.label}${dupeTag}</div>
+          <div style="font-size:11px;color:var(--muted)">${row.date}</div>
+        </div>
+        <div style="${amtColor};font-family:'DM Mono',monospace;font-weight:700;font-size:14px;flex-shrink:0">${prefix}${fmt(Math.abs(row.amount))}</div>
+      </div>
+      ${row.selected ? `<select onclick="event.stopPropagation()" onchange="setImportCategory(${row.idx}, this.value)"
+        style="width:100%;padding:6px 8px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-size:12px;font-family:'Sora',sans-serif">
+        <option value="">— Catégorie —</option>
+        ${catOptions}
+      </select>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function toggleImportRow(idx) {
+  const row = _importRows.find(r => r.idx === idx);
+  if(row) { row.selected = !row.selected; renderImportPreview(); }
+}
+
+function setImportCategory(idx, catId) {
+  const row = _importRows.find(r => r.idx === idx);
+  if(row) row.category = catId;
+}
+
+function confirmImport() {
+  const accountId = document.getElementById('import-account').value;
+  if(!accountId) { alert('Sélectionne un compte'); return; }
+
+  const toImport = _importRows.filter(r => r.selected);
+  if(!toImport.length) { alert('Aucune écriture sélectionnée'); return; }
+
+  const imported = toImport.length;
+  toImport.forEach((row, i) => {
+    const type = row.amount >= 0 ? 'income' : 'expense';
+    // Utiliser pushTransaction qui gère save+sync correctement
+    pushTransaction({
+      accountId,
+      type,
+      label: row.label,
+      amount: Math.abs(row.amount),
+      date: row.date,
+      category: row.category || null,
+      note: row.detail || null,
+      unpointed: true,
+      imported: true
+    });
+  });
+
+  closeSheet('import-sheet');
+  alert('✅ ' + imported + ' écriture(s) importée(s) avec succès !');
 }
 
 </script>
