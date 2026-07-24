@@ -1145,7 +1145,7 @@
 //  CONSTANTES & STORAGE (avant db)
 // ════════════════════════════════════
 const STORAGE_KEY = 'mc_data_v2';
-const APP_VERSION = '2.2.0';
+const APP_VERSION = '2.2.1';
 
 // Render account icon: image if base64, emoji otherwise
 function iconHTML(icon, size='26px') {
@@ -2619,7 +2619,9 @@ function renderDashboard() {
         : `${dateStr} · ${acc?acc.name:'?'} · ${cat.label}`;
       const pointed  = r.pointed && r.pointed[monthKey];
       const pointedStyle = pointed ? 'opacity:.45;text-decoration:line-through' : '';
-      const importedStyle = (!pointed && r.imported) ? 'background:rgba(244,63,94,.08);border-radius:10px;' : '';
+      const _importedIds = JSON.parse(localStorage.getItem('imported_tx_ids') || '[]');
+      const _importKey = r.label + '_' + r.date + '_' + Math.abs(r.amount);
+      const importedStyle = (!pointed && r.unpointed && _importedIds.includes(_importKey)) ? 'background:rgba(244,63,94,.08);border-radius:10px;' : '';
       return `<div class="tx-item" style="${pointedStyle}${importedStyle}">
         <div class="tx-icon" style="background:${bgCol};font-size:${isTransfer?'16px':'18px'}">${icon}</div>
         <div class="tx-info">
@@ -3773,7 +3775,6 @@ function transactionToRow(t) {
     transfer_from:t.transferFrom || null,
     transfer_to:  t.transferTo || null,
     is_recurring: t.isRecurring || false,
-    imported:     t.imported || false,
     recurring_id: t.recurringId || null,
     is_unpointed: t.unpointed || false
   };
@@ -4976,9 +4977,10 @@ function confirmImport() {
   if(!toImport.length) { alert('Aucune écriture sélectionnée'); return; }
 
   const imported = toImport.length;
+  const importedIds = JSON.parse(localStorage.getItem('imported_tx_ids') || '[]');
   toImport.forEach((row, i) => {
     const type = row.amount >= 0 ? 'income' : 'expense';
-    // Utiliser pushTransaction qui gère save+sync correctement
+    const id = Date.now().toString() + i;
     pushTransaction({
       accountId,
       type,
@@ -4987,10 +4989,12 @@ function confirmImport() {
       date: row.date,
       category: row.category || null,
       note: row.detail || null,
-      unpointed: true,
-      imported: true
+      unpointed: true
     });
+    // Mémoriser l'ID comme importé (label+date comme clé car pushTransaction génère son propre ID)
+    importedIds.push(row.label + '_' + row.date + '_' + Math.abs(row.amount));
   });
+  localStorage.setItem('imported_tx_ids', JSON.stringify(importedIds));
 
   closeSheet('import-sheet');
   alert('✅ ' + imported + ' écriture(s) importée(s) avec succès !');
