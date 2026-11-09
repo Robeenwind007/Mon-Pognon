@@ -3726,13 +3726,25 @@ async function sbDelete(table, ids) {
 }
 
 // Select tous les enregistrements d'une table
+// Le serveur renvoie au plus 1000 lignes par requête : on lit par pages
+// jusqu'à épuisement. `id` est ajouté au tri pour que les pages ne se
+// chevauchent pas quand plusieurs lignes ont la même date.
+const SB_PAGE_SIZE = 1000;
 async function sbSelect(table, params) {
-  const qs = params ? '?' + params : '';
-  const res = await fetch(`${SB_URL}/rest/v1/${table}${qs}`, {
-    headers: sbHeaders()
-  });
-  if(!res.ok) throw new Error(`select ${table}: ${res.status}`);
-  return res.json();
+  const sp = new URLSearchParams(params || '');
+  sp.set('order', sp.has('order') ? sp.get('order') + ',id.asc' : 'id.asc');
+  sp.set('limit', SB_PAGE_SIZE);
+  const rows = [];
+  for(let offset = 0; ; offset += SB_PAGE_SIZE) {
+    sp.set('offset', offset);
+    const res = await fetch(`${SB_URL}/rest/v1/${table}?${sp}`, {
+      headers: sbHeaders()
+    });
+    if(!res.ok) throw new Error(`select ${table}: ${res.status}`);
+    const page = await res.json();
+    rows.push(...page);
+    if(page.length < SB_PAGE_SIZE) return rows;
+  }
 }
 
 // ════════════════════════════════════
