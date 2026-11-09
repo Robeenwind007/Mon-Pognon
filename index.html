@@ -3668,8 +3668,8 @@ async function forceSync() {
 // ════════════════════════════════════
 //  SUPABASE — CONFIG & HELPERS
 // ════════════════════════════════════
-const SB_URL = 'https://nqhcphhxdwqksgxcrafh.supabase.co';
-const SB_KEY = 'sb_publishable_fvlEQ8tNlXSj7J15gqf-fQ_MK0900fm';
+const SB_URL = 'https://api.kgb-sofware.com';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzkzOTU0OTA1LCJleHAiOjE5NTE2MzQ5MDV9.SiFSitUW3CCXNkiO-gkv2kvhigDxrTNaLRXzjvpj1bE';
 
 let syncTimeout = null;
 let syncBusy    = false;
@@ -3679,6 +3679,9 @@ function sbHeaders(extra) {
     'Content-Type': 'application/json',
     'apikey': SB_KEY,
     'Authorization': `Bearer ${SB_KEY}`,
+    // Serveur KGB auto-hébergé : les tables de l'app sont dans le schéma « monpognon »
+    'Accept-Profile':  'monpognon',
+    'Content-Profile': 'monpognon',
     ...(extra || {})
   };
 }

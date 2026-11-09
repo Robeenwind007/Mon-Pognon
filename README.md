@@ -44,7 +44,7 @@ Import automatique des écritures depuis un export CSV SG (séparateur point-vir
 
 ## Supabase
 
-**Projet :** `https://nqhcphhxdwqksgxcrafh.supabase.co`
+**Projet :** `https://api.kgb-sofware.com` (Supabase auto-hébergé, schéma `monpognon`)
 
 | Table | Description |
 |---|---|
